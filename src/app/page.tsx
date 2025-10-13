@@ -2,11 +2,23 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {useAuthStore} from "../presentation/contexts/auth-store";
+import { useAuthStore } from '../presentation/contexts/auth-store';
 
 export default function Home() {
     const router = useRouter();
-    const { isAuthenticated, isLoading } = useAuthStore();
+    const { isAuthenticated, isLoading, initialize, setLoading } = useAuthStore();
+
+    useEffect(() => {
+        // Initialize the store on mount
+        initialize();
+
+        // Fallback: ensure loading is set to false after a short delay
+        const timeout = setTimeout(() => {
+            setLoading(false);
+        }, 500);
+
+        return () => clearTimeout(timeout);
+    }, [initialize, setLoading]);
 
     useEffect(() => {
         if (!isLoading) {

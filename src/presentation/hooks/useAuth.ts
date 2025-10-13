@@ -1,12 +1,12 @@
-// Authentication Hook
-
+// Authentication Hook - WITH MOCK DATA SUPPORT
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {User} from "../../core/entities";
-import {useAuthStore} from "../contexts/auth-store";
-import {apiClient} from "../../infrastructure/api/client";
-import {ApiError} from "next/dist/server/api-utils";
+import { User } from '../../core/entities';
+import { useAuthStore } from '../contexts/auth-store';
+import { MockAuthService } from '../../infrastructure/api/mock-auth.service';
 
+// Toggle this to switch between mock and real API
+const USE_MOCK_API = true;
 
 interface LoginCredentials {
     email: string;
@@ -29,8 +29,20 @@ export function useAuth() {
         setError(null);
 
         try {
-            // Call your actual API endpoint
-            const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
+            let response: LoginResponse;
+
+            if (USE_MOCK_API) {
+                // Use mock authentication
+                response = await MockAuthService.login(
+                    credentials.email,
+                    credentials.password
+                );
+            } else {
+                // Use real API (when backend is ready)
+                // const apiClient = await import('../../infrastructure/api/client');
+                // response = await apiClient.apiClient.post<LoginResponse>('/auth/login', credentials);
+                throw new Error('Real API not configured yet');
+            }
 
             // Store auth data
             setAuth(response.user, response.token);
@@ -39,9 +51,9 @@ export function useAuth() {
             router.push('/dashboard');
 
             return response;
-        } catch (err) {
-            const apiError = err as ApiError;
-            setError(apiError.message);
+        } catch (err: any) {
+            const errorMessage = err.message || 'Login failed. Please try again.';
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);
@@ -52,8 +64,11 @@ export function useAuth() {
         setLoading(true);
 
         try {
-            // Optional: Call logout endpoint
-            await apiClient.post('/auth/logout');
+            if (USE_MOCK_API) {
+                await MockAuthService.logout();
+            } else {
+                // await apiClient.post('/auth/logout');
+            }
         } catch (err) {
             console.error('Logout error:', err);
         } finally {
@@ -68,13 +83,11 @@ export function useAuth() {
         setError(null);
 
         try {
-            const response = await apiClient.post<LoginResponse>('/auth/register', userData);
-            setAuth(response.user, response.token);
-            router.push('/dashboard');
-            return response;
-        } catch (err) {
-            const apiError = err as ApiError;
-            setError(apiError.message);
+            // For now, just throw an error as registration is not implemented
+            throw new Error('Registration is not available in mock mode');
+        } catch (err: any) {
+            const errorMessage = err.message || 'Registration failed';
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);
@@ -86,11 +99,12 @@ export function useAuth() {
         setError(null);
 
         try {
-            await apiClient.post('/auth/reset-password', { email });
+            // Mock password reset
+            await new Promise(resolve => setTimeout(resolve, 1000));
             return true;
-        } catch (err) {
-            const apiError = err as ApiError;
-            setError(apiError.message);
+        } catch (err: any) {
+            const errorMessage = err.message || 'Password reset failed';
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);

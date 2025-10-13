@@ -2,14 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
-import {useAuth} from "../../presentation/hooks/useAuth";
-import {cn} from "../../shared/utils/cn";
+import { Mail, Lock, Eye, EyeOff, Loader2, Copy, Check } from 'lucide-react';
+import { useAuth } from '../../presentation/hooks/useAuth';
+import { cn } from '../../shared/utils/cn';
+import { MOCK_CREDENTIALS } from '../../infrastructure/api/mock-auth.service';
 
 export default function LoginPage() {
     const router = useRouter();
     const { login, isAuthenticated, loading, error: authError } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -26,9 +28,7 @@ export default function LoginPage() {
 
         try {
             await login(formData);
-            // Router.push is handled in the hook
         } catch (err) {
-            // Error is already set in the hook
             console.error('Login failed:', err);
         }
     };
@@ -38,6 +38,20 @@ export default function LoginPage() {
             ...formData,
             [e.target.name]: e.target.value,
         });
+    };
+
+    const handleQuickLogin = (role: 'admin' | 'manager' | 'user') => {
+        const credentials = MOCK_CREDENTIALS[role];
+        setFormData({
+            email: credentials.email,
+            password: credentials.password,
+        });
+    };
+
+    const copyToClipboard = (text: string, field: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
     };
 
     return (
@@ -161,10 +175,62 @@ export default function LoginPage() {
                     </form>
 
                     {/* Demo Credentials */}
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-600 text-center">
-                            Connect to your API endpoint to enable authentication
+                    <div className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-100">
+                        <p className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            Quick Login (Demo Mode)
                         </p>
+
+                        <div className="space-y-2">
+                            {Object.entries(MOCK_CREDENTIALS).map(([role, creds]) => (
+                                <div
+                                    key={role}
+                                    className="flex items-center justify-between p-3 bg-white rounded-lg hover:shadow-sm transition-shadow"
+                                >
+                                    <div className="flex-1">
+                                        <p className="text-xs font-semibold text-gray-700 uppercase mb-1">
+                                            {role}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                                            <span className="font-mono">{creds.email}</span>
+                                            <button
+                                                onClick={() => copyToClipboard(creds.email, `${role}-email`)}
+                                                className="text-blue-600 hover:text-blue-700"
+                                                title="Copy email"
+                                            >
+                                                {copiedField === `${role}-email` ? (
+                                                    <Check className="w-3 h-3" />
+                                                ) : (
+                                                    <Copy className="w-3 h-3" />
+                                                )}
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                                            <span className="font-mono">{creds.password}</span>
+                                            <button
+                                                onClick={() => copyToClipboard(creds.password, `${role}-pass`)}
+                                                className="text-blue-600 hover:text-blue-700"
+                                                title="Copy password"
+                                            >
+                                                {copiedField === `${role}-pass` ? (
+                                                    <Check className="w-3 h-3" />
+                                                ) : (
+                                                    <Copy className="w-3 h-3" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleQuickLogin(role as 'admin' | 'manager' | 'user')}
+                                        disabled={loading}
+                                        className="ml-3 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        Use
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
