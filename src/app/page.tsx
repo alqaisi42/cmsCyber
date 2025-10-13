@@ -1,44 +1,26 @@
+
 'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../presentation/contexts/auth-store';
 
-export default function Home() {
+export default function HomePage() {
     const router = useRouter();
-    const { isAuthenticated, isLoading, initialize, setLoading } = useAuthStore();
 
     useEffect(() => {
-        // Initialize the store on mount
-        initialize();
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
 
-        // Fallback: ensure loading is set to false after a short delay
-        const timeout = setTimeout(() => {
-            setLoading(false);
-        }, 500);
-
-        return () => clearTimeout(timeout);
-    }, [initialize, setLoading]);
-
-    useEffect(() => {
-        if (!isLoading) {
-            if (isAuthenticated) {
-                router.push('/dashboard');
-            } else {
-                router.push('/login');
-            }
+        if (token) {
+            router.push('/dashboard');
+        } else {
+            router.push('/login');
         }
-    }, [isAuthenticated, isLoading, router]);
+    }, [router]);
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-            <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 animate-pulse">
-                    <span className="text-2xl font-bold text-white">3L</span>
-                </div>
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Loading...</p>
-            </div>
+        <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
     );
 }
