@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Lock, User, Globe, AlertCircle } from 'lucide-react';
+import {useAuthStore} from "../../presentation/contexts/auth-store";
 
 export default function LoginPage() {
     const router = useRouter();
+    const { setAuth } = useAuthStore();
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -36,6 +38,15 @@ export default function LoginPage() {
                     clinic: 'Ameen Ibrahim Medical Center'
                 }));
 
+                const user = {
+                    id: '1',
+                    name: 'Dr. Ameen Ibrahim Ahmad Abu Leel',
+                    role: 'doctor',
+                    clinic: 'Ameen Ibrahim Medical Center',
+                };
+
+                setAuth(user, 'mock-jwt-token');
+                document.cookie = 'token=mock-jwt-token; path=/';
                 // Redirect to dashboard
                 router.push('/dashboard');
                 router.refresh();

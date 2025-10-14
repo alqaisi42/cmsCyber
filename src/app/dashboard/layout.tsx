@@ -1,4 +1,3 @@
-// Dashboard Layout Wrapper
 'use client';
 
 import { useEffect } from 'react';
@@ -15,7 +14,6 @@ export default function DashboardLayout({
     const { isAuthenticated, isLoading, initialize } = useAuthStore();
 
     useEffect(() => {
-        // Initialize auth store
         initialize();
     }, [initialize]);
 
@@ -40,16 +38,14 @@ export default function DashboardLayout({
     }
 
     if (!isAuthenticated) {
-        return null;
+        return null; // This will be hit only after isLoading is false
     }
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            <Sidebar />
+            {/*<Sidebar />*/}
             <main className="flex-1 lg:ml-64 p-8">
-                <div className="max-w-7xl mx-auto">
-                    {children}
-                </div>
+                <div className="max-w-7xl mx-auto">{children}</div>
             </main>
         </div>
     );
