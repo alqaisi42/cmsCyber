@@ -1,7 +1,6 @@
-// src/app/dashboard/products/[providerId]/variants/page.tsx
+// src/app/dashboard/products/[productId]/variants/page.tsx
 'use client';
 
-import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
     ArrowLeft,
@@ -10,8 +9,6 @@ import {
     Trash2,
     Package,
     AlertTriangle,
-    Check,
-    X,
     Image as ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -19,14 +16,24 @@ import {
     useDeleteProductVariant,
     useProduct,
     useProductVariants
-} from "../../../../../../../presentation/hooks/useProviders";
-import {Button} from "../../../../../../../presentation/components/ui";
-import {ProductVariant} from "../../../../../../../core/entities";
+} from "../../../../../presentation/hooks/useProviders";
+import {Button} from "../../../../../presentation/components/ui";
+import {ProductVariant} from "../../../../../core/entities";
 
 export default function ProductVariantsPage() {
     const params = useParams();
     const router = useRouter();
-    const productId = params.id as string;
+    const productId = params?.productId as string;
+
+    if (!productId) {
+        return (
+            <div className="p-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+                    Invalid product reference.
+                </div>
+            </div>
+        );
+    }
 
     const { data: product, isLoading: productLoading } = useProduct(productId);
     const { data: variants, isLoading: variantsLoading } = useProductVariants(productId);

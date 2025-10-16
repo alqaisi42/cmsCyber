@@ -16,7 +16,7 @@ export interface ApiError {
     data?: any;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 class ApiClient {
     private client: AxiosInstance;

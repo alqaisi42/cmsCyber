@@ -218,11 +218,16 @@ function ProviderCard({ provider, onDelete }: {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
-                <Link href={`/dashboard/providers/${provider.id}/products`} className="flex-1">
+            <div className="flex flex-wrap gap-2">
+                <Link href={`/dashboard/providers/${provider.id}`} className="flex-1 min-w-[120px]">
+                    <Button variant="secondary" size="sm" className="w-full">
+                        Overview
+                    </Button>
+                </Link>
+                <Link href={`/dashboard/providers/${provider.id}/products`} className="flex-1 min-w-[140px]">
                     <Button variant="primary" size="sm" className="w-full">
                         <Package className="w-4 h-4 mr-1" />
-                        View Products
+                        Products
                     </Button>
                 </Link>
                 <Link href={`/dashboard/providers/${provider.id}/edit`}>
