@@ -1,6 +1,4 @@
 // src/infrastructure/services/admin.service.ts
-import { apiClient } from '../api/client';
-
 export interface UserFilters {
     searchQuery?: string;
     role?: string;
@@ -81,10 +79,7 @@ export interface StatisticsResponse {
 }
 
 class AdminUserService {
-    private readonly baseUrl = '/api/v1/admin/users';
-
-    // Update this to point to your actual backend
-    private readonly apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://148.230.111.245:32080';
+    private readonly baseUrl = '/api/admin/users';
 
     async getUsers(filters: UserFilters = {}): Promise<UsersResponse> {
         const params = new URLSearchParams();
@@ -108,8 +103,8 @@ class AdminUserService {
         if (filters.size !== undefined) params.append('size', String(filters.size));
 
         try {
-            // Direct API call to your backend
-            const response = await fetch(`${this.apiUrl}${this.baseUrl}?${params.toString()}`, {
+            // Call the Next.js API route which proxies to the backend to avoid CORS issues
+            const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -133,7 +128,7 @@ class AdminUserService {
 
     async getUserStatistics(): Promise<StatisticsResponse> {
         try {
-            const response = await fetch(`${this.apiUrl}${this.baseUrl}/statistics`, {
+            const response = await fetch(`${this.baseUrl}/statistics`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -155,7 +150,7 @@ class AdminUserService {
 
     async updateUser(userId: number, data: Partial<AdminUser>): Promise<any> {
         try {
-            const response = await fetch(`${this.apiUrl}${this.baseUrl}/${userId}`, {
+            const response = await fetch(`${this.baseUrl}/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Accept': 'application/json',
@@ -177,7 +172,7 @@ class AdminUserService {
 
     async deleteUser(userId: number): Promise<void> {
         try {
-            const response = await fetch(`${this.apiUrl}${this.baseUrl}/${userId}`, {
+            const response = await fetch(`${this.baseUrl}/${userId}`, {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -200,7 +195,7 @@ class AdminUserService {
 
     async resetPassword(userId: number): Promise<any> {
         try {
-            const response = await fetch(`${this.apiUrl}${this.baseUrl}/${userId}/reset-password`, {
+            const response = await fetch(`${this.baseUrl}/${userId}/reset-password`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
