@@ -8,10 +8,7 @@ import {
     Search,
     Plus,
     Edit,
-    Trash2,
-    Eye,
     Package,
-    DollarSign,
     Star,
     Tag,
     Layers
@@ -24,11 +21,21 @@ import {Product} from "../../../../../core/entities";
 export default function ProviderProductsPage() {
     const params = useParams();
     const router = useRouter();
-    const providerId = params.id as string;
+    const providerId = params?.providerId as string;
 
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(0);
     const pageSize = 12;
+
+    if (!providerId) {
+        return (
+            <div className="p-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+                    Invalid provider reference.
+                </div>
+            </div>
+        );
+    }
 
     const { data: provider, isLoading: providerLoading } = useProvider(providerId);
     const { data: productsData, isLoading: productsLoading } = useProviderProducts(

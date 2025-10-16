@@ -1,4 +1,4 @@
-// src/app/dashboard/products/[providerId]/edit/page.tsx
+// src/app/dashboard/products/[productId]/edit/page.tsx
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -9,7 +9,17 @@ import {ProductForm} from "../../../../../presentation/components/products/Produ
 export default function EditProductPage() {
     const router = useRouter();
     const params = useParams();
-    const productId = params.id as string;
+    const productId = params?.productId as string;
+
+    if (!productId) {
+        return (
+            <div className="p-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                    Invalid product reference
+                </div>
+            </div>
+        );
+    }
 
     const { data: product, isLoading } = useProduct(productId);
 

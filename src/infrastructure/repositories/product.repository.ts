@@ -11,7 +11,8 @@ import {
     ProductCreateDto,
     ProductVariantCreateDto,
     ProductSearchParams,
-    ProductDetail
+    ProductDetail,
+    Category
 } from '../../core/entities';
 
 // ============================================================================
@@ -157,14 +158,43 @@ export class ProductVariantRepository {
 export class CategoryRepository {
     private readonly baseUrl = '/api/v1/categories';
 
-    async getAll(): Promise<any[]> {
-        // Implement when API is available
-        return [];
+    async getAll(): Promise<Category[]> {
+        const response = await apiClient.get<ApiResponse<Category[]>>(this.baseUrl);
+        return response.data;
     }
 
-    async getById(id: string): Promise<any> {
-        // Implement when API is available
-        return {};
+    async getTree(): Promise<Category[]> {
+        try {
+            const response = await apiClient.get<ApiResponse<Category[]>>(`${this.baseUrl}/tree`);
+            return response.data;
+        } catch (error) {
+            // Fallback to flat list if tree endpoint is not available
+            return this.getAll();
+        }
+    }
+
+    async getById(id: string): Promise<Category> {
+        const response = await apiClient.get<ApiResponse<Category>>(`${this.baseUrl}/${id}`);
+        return response.data;
+    }
+
+    async create(data: Partial<Category>): Promise<Category> {
+        const response = await apiClient.post<ApiResponse<Category>>(this.baseUrl, data);
+        return response.data;
+    }
+
+    async createSubcategory(parentId: string, data: Partial<Category>): Promise<Category> {
+        const response = await apiClient.post<ApiResponse<Category>>(`${this.baseUrl}/${parentId}/subcategories`, data);
+        return response.data;
+    }
+
+    async update(id: string, data: Partial<Category>): Promise<Category> {
+        const response = await apiClient.patch<ApiResponse<Category>>(`${this.baseUrl}/${id}`, data);
+        return response.data;
+    }
+
+    async delete(id: string): Promise<void> {
+        await apiClient.delete(`${this.baseUrl}/${id}`);
     }
 }
 

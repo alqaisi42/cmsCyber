@@ -8,7 +8,7 @@ import { MockDataService, MOCK_USERS } from '../api/mock-data.service';
 const USE_MOCK_API = true;
 
 export class UserRepository implements IUserRepository {
-    private readonly baseUrl = '/users';
+    private readonly baseUrl = '/api/v1/users';
 
     async getAll(params: PaginationParams): Promise<PaginatedResponse<User>> {
         if (USE_MOCK_API) {
