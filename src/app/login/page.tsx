@@ -1,9 +1,11 @@
+// src/app/login/page.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Lock, User, Globe, AlertCircle } from 'lucide-react';
-import {useAuthStore} from "../../presentation/contexts/auth-store";
+import { useAuthStore } from "../../presentation/contexts/auth-store";
+import { User as UserType, UserRole, UserStatus } from '../../core/entities';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -26,32 +28,56 @@ export default function LoginPage() {
             // Simulate API delay
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Simple validation
+            // Simple validation for demo/3lababee system
             if (formData.username === 'demo' && formData.password === 'demo123') {
-                // Store token in cookie and localStorage
-                document.cookie = 'token=mock-jwt-token; path=/';
-                localStorage.setItem('token', 'mock-jwt-token');
-                localStorage.setItem('user', JSON.stringify({
+                // Create a proper User object matching the User type
+                const user: UserType = {
                     id: '1',
-                    name: 'Dr. Ameen Ibrahim Ahmad Abu Leel',
-                    role: 'doctor',
-                    clinic: 'Ameen Ibrahim Medical Center'
-                }));
-
-                const user = {
-                    id: '1',
-                    name: 'Dr. Ameen Ibrahim Ahmad Abu Leel',
-                    role: 'doctor',
-                    clinic: 'Ameen Ibrahim Medical Center',
+                    email: 'demo@3lababee.com', // Required field
+                    name: 'Demo User',
+                    role: UserRole.USER, // Regular user role
+                    status: UserStatus.ACTIVE, // Required field
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date(),
+                    phone: '+962-79-1234567',
+                    avatar: 'https://ui-avatars.com/api/?name=Demo+User&background=3b82f6&color=fff'
                 };
 
+                // Store in localStorage for persistence
+                localStorage.setItem('token', 'mock-jwt-token');
+                localStorage.setItem('user', JSON.stringify(user));
+
+                // Set auth in store
                 setAuth(user, 'mock-jwt-token');
+
+                // Set cookie for middleware
                 document.cookie = 'token=mock-jwt-token; path=/';
+
                 // Redirect to dashboard
                 router.push('/dashboard');
                 router.refresh();
+            } else if (formData.username === 'admin' && formData.password === 'admin123') {
+                // Admin user for 3lababee system
+                const user: UserType = {
+                    id: '2',
+                    email: 'admin@3lababee.com',
+                    name: 'Admin User',
+                    role: UserRole.ADMIN,
+                    status: UserStatus.ACTIVE,
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date(),
+                    phone: '+962-79-9876543',
+                    avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=3b82f6&color=fff'
+                };
+
+                localStorage.setItem('token', 'admin-jwt-token');
+                localStorage.setItem('user', JSON.stringify(user));
+                setAuth(user, 'admin-jwt-token');
+                document.cookie = 'token=admin-jwt-token; path=/';
+                router.push('/dashboard');
+                router.refresh();
             } else {
-                setError('Invalid username or password. Use demo/demo123');
+                setError('Invalid username or password. Use demo/demo123 or admin/admin123');
             }
         } catch (err) {
             setError('An error occurred. Please try again.');
@@ -82,183 +108,140 @@ export default function LoginPage() {
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-4">
                         <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                            <span className="text-2xl font-bold text-white">3L</span>
                         </div>
                     </div>
-
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">
-                        MEDEXA Jordan
-                    </h1>
-                    <p className="text-lg text-slate-600 mb-1">
-                        Health Insurance Management
-                    </p>
-                    <p className="text-sm text-slate-500">
-                        ميديكسا الأردن
-                    </p>
+                    <h1 className="text-3xl font-bold text-gray-900">Welcome to 3lababee</h1>
+                    <p className="text-gray-600 mt-2">Admin Management Portal</p>
                 </div>
 
-                {/* Login Card */}
-                <div className="bg-white rounded-3xl shadow-2xl p-8 border border-slate-200">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-6">
-                        Provider Login
-                    </h2>
+                {/* Login Form */}
+                <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8">
+                    {/* Demo Credentials Info */}
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
+                        <div className="text-sm text-blue-700 space-y-1">
+                            <p>User: <span className="font-mono">demo / demo123</span></p>
+                            <p>Admin: <span className="font-mono">admin / admin123</span></p>
+                        </div>
+                    </div>
 
                     {/* Error Message */}
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm font-medium text-red-900">{error}</p>
-                            </div>
+                            <p className="text-sm text-red-800">{error}</p>
                         </div>
                     )}
 
-                    {/* Demo Credentials Info */}
-                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                        <p className="text-sm font-medium text-blue-900 mb-2">Demo Credentials:</p>
-                        <p className="text-xs text-blue-700 font-mono">
-                            Username: <strong>demo</strong> / Password: <strong>demo123</strong>
-                        </p>
+                    {/* Username Field */}
+                    <div className="mb-6">
+                        <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                            Username
+                        </label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                value={formData.username}
+                                onChange={handleChange}
+                                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Enter your username"
+                                required
+                                readOnly={isLoading}
+
+                            />
+                        </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Username Field */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Username
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <User className="w-5 h-5 text-slate-400" />
-                                </div>
-                                <input
-                                    name="username"
-                                    type="text"
-                                    value={formData.username}
-                                    onChange={handleChange}
-                                    placeholder="Enter your username"
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                    required
-                                />
-                            </div>
-                        </div>
+                    {/* Password Field */}
+                    <div className="mb-6">
+                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                            Password
+                        </label>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                id="password"
+                                name="password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                className="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                placeholder="Enter your password"
+                                required
+                                readOnly={isLoading}
 
-                        {/* Password Field */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Password
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="w-5 h-5 text-slate-400" />
-                                </div>
-                                <input
-                                    name="password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="Enter your password"
-                                    className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="w-5 h-5" />
-                                    ) : (
-                                        <Eye className="w-5 h-5" />
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Language Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">
-                                Language / اللغة
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Globe className="w-5 h-5 text-slate-400" />
-                                </div>
-                                <select
-                                    name="language"
-                                    value={formData.language}
-                                    onChange={handleChange}
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-                                >
-                                    <option value="en">English</option>
-                                    <option value="ar">العربية (Arabic)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Remember Me & Forgot Password */}
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-slate-600">Remember me</span>
-                            </label>
+                            />
                             <button
                                 type="button"
-                                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                                disabled={isLoading}
                             >
-                                Forgot password?
+                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                         </div>
-
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
-                        >
-                            {isLoading ? (
-                                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing in...
-                </span>
-                            ) : (
-                                'Login'
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Support Link */}
-                    <div className="mt-6 pt-6 border-t border-slate-200 text-center">
-                        <p className="text-sm text-slate-600">
-                            Need help?{' '}
-                            <a href="#" className="font-medium text-blue-600 hover:text-blue-700">
-                                Contact Support
-                            </a>
-                        </p>
                     </div>
-                </div>
 
-                {/* Footer Links */}
-                <div className="mt-8 text-center space-y-2">
-                    <div className="flex items-center justify-center gap-4 text-sm text-slate-600">
-                        <a href="#" className="hover:text-blue-600 transition-colors">
-                            Medexa Jordan - ميديكسا الأردن
-                        </a>
-                        <span>•</span>
-                        <a href="#" className="hover:text-blue-600 transition-colors">
-                            Medexa International - ميديكسا الدوليّة
+                    {/* Language Selector */}
+                    <div className="mb-6">
+                        <label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
+                            Language
+                        </label>
+                        <div className="relative">
+                            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <select
+                                id="language"
+                                name="language"
+                                value={formData.language}
+                                onChange={handleChange}
+                                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition appearance-none bg-white"
+                                disabled={isLoading}
+                            >
+                                <option value="en">English</option>
+                                <option value="ar">العربية</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Remember Me & Forgot Password */}
+                    <div className="flex items-center justify-between mb-6">
+                        <label className="flex items-center">
+                            <input type="checkbox" className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+                            <span className="ml-2 text-sm text-gray-600">Remember me</span>
+                        </label>
+                        <a href="#" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                            Forgot password?
                         </a>
                     </div>
-                    <p className="text-xs text-slate-500">
-                        © 2025 Medexa Healthcare. All rights reserved.
+
+                    {/* Submit Button */}
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:ring-4 focus:ring-blue-300 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? (
+                            <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Signing in...
+                            </span>
+                        ) : (
+                            'Sign In'
+                        )}
+                    </button>
+                </form>
+
+                {/* Footer */}
+                <div className="text-center mt-8">
+                    <p className="text-sm text-gray-600">
+                        © 2024 3lababee. All rights reserved.
                     </p>
                 </div>
             </div>
