@@ -1,6 +1,4 @@
 // src/infrastructure/repositories/product.repository.ts
-// Product Management Repositories
-
 import { apiClient } from '../api/client';
 import {
     ApiResponse,
@@ -20,7 +18,7 @@ import {
 // ============================================================================
 
 export class ProviderRepository {
-    private readonly baseUrl = '/api/v1/providers';
+    private readonly baseUrl = '/providers';
 
     async getAll(): Promise<Provider[]> {
         const response = await apiClient.get<ApiResponse<Provider[]>>(this.baseUrl);
@@ -63,7 +61,7 @@ export class ProviderRepository {
 // ============================================================================
 
 export class ProductRepository {
-    private readonly baseUrl = '/api/v1/products';
+    private readonly baseUrl = '/products';
 
     async search(params: ProductSearchParams): Promise<PaginatedData<Product>> {
         const queryParams = new URLSearchParams();
@@ -110,7 +108,7 @@ export class ProductRepository {
 // ============================================================================
 
 export class ProductVariantRepository {
-    private readonly baseUrl = '/api/v1/products';
+    private readonly baseUrl = '/products';
 
     async getByProductId(productId: string): Promise<ProductVariant[]> {
         const response = await apiClient.get<ApiResponse<ProductVariant[]>>(
@@ -152,11 +150,11 @@ export class ProductVariantRepository {
 }
 
 // ============================================================================
-// CATEGORY REPOSITORY (Placeholder - Add if API exists)
+// CATEGORY REPOSITORY
 // ============================================================================
 
 export class CategoryRepository {
-    private readonly baseUrl = '/api/v1/categories';
+    private readonly baseUrl = '/categories';
 
     async getAll(): Promise<Category[]> {
         const response = await apiClient.get<ApiResponse<Category[]>>(this.baseUrl);

@@ -1,5 +1,4 @@
-// API Client with Axios - Infrastructure Layer
-
+// apiClient.ts
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 // Error response type definitions
@@ -37,6 +36,7 @@ class ApiClient {
             headers: {
                 'Content-Type': 'application/json',
             },
+            withCredentials: true, // Enable credentials for cross-origin requests
         });
 
         this.setupInterceptors();
@@ -83,7 +83,12 @@ class ApiClient {
 
     private normalizeError(error: AxiosError<ErrorResponse>): ApiError {
         const responseData = error.response?.data;
-        const message = this.extractErrorMessage(responseData, error.message);
+        let message = this.extractErrorMessage(responseData, error.message);
+
+        // Detect CORS-specific errors
+        if (!error.response && error.message.includes('Network Error')) {
+            message = 'CORS error: The server may not be configured to allow requests from this origin.';
+        }
 
         return {
             message,
