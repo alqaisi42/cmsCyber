@@ -16,7 +16,16 @@ export interface ApiError {
     data?: any;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+const DEFAULT_API_BASE_PATH = '/api/v1';
+const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+// Force browser requests through the Next.js rewrite proxy unless a custom
+// relative base path is provided. This prevents accidental use of the absolute
+// backend origin which would reintroduce strict-origin CORS errors.
+const API_BASE_URL =
+    configuredBaseUrl && !configuredBaseUrl.startsWith('http')
+        ? configuredBaseUrl
+        : DEFAULT_API_BASE_PATH;
 
 class ApiClient {
     private client: AxiosInstance;

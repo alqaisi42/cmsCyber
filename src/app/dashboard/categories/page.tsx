@@ -18,10 +18,9 @@ import {
     useDeleteCategory,
     useUpdateCategory,
 } from '../../../presentation/hooks/useCategories';
-import { Badge, Button } from '../../../presentation/components/ui';
+import { Badge, Button, Modal } from '../../../presentation/components/ui';
 import { Category } from '../../../core/entities';
 import { cn } from '../../../shared/utils/cn';
-import {Modal} from "../../../presentation/components/ui/Modal";
 
 interface CategoryModalState {
     mode: 'create' | 'edit';

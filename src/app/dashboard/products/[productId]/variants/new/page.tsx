@@ -3,9 +3,9 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import {useProduct} from "../../../../../../presentation/hooks/useProviders";
-import {ProductVariantForm} from "../../../../../../presentation/components/products/ProductVariantForm";
 
+import { ProductVariantForm } from '../../../../../presentation/components/products/ProductVariantForm';
+import { useProduct } from '../../../../../presentation/hooks/useProviders';
 
 export default function NewProductVariantPage() {
     const router = useRouter();

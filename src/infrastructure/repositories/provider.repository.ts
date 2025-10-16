@@ -4,7 +4,7 @@ import { Provider } from '../../core/entities';
 import { apiClient } from '../api/client';
 
 export class ProviderRepository implements IProviderRepository {
-    private readonly baseUrl = '/providers';
+    private readonly baseUrl = '/api/v1/providers';
 
     async getAll(params: PaginationParams): Promise<PaginatedResponse<Provider>> {
         const queryParams = new URLSearchParams({
