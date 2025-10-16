@@ -1,11 +1,11 @@
 // src/app/dashboard/admin/users/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Users, UserCheck, Shield, Activity, Calendar, TrendingUp,
-    Search, Filter, Download, RefreshCw, Edit2, Trash2,
-    Lock, Unlock, Mail, Phone, Globe, ChevronDown, X
+    Search, Filter, Download, RefreshCw, Trash2,
+    Lock, Unlock, Phone, Globe, ChevronDown, X, UserCog
 } from 'lucide-react';
 import { adminUserService, AdminUser, UserStatistics, UserFilters } from '../../../../infrastructure/services/admin.service';
 import { formatDate } from '../../../../shared/utils/cn';
@@ -32,10 +32,14 @@ export default function AdminUsersPage() {
         emailVerified: undefined,
         phoneVerified: undefined,
         twoFactorEnabled: undefined,
-        socialProvider: '',
         isLocked: undefined,
         sortBy: 'createdAt',
         sortDirection: 'desc',
+        createdAfter: '',
+        createdBefore: '',
+        lastLoginAfter: '',
+        lastLoginBefore: '',
+        socialProvider: '',
         page: 0,
         size: 20
     });
@@ -52,8 +56,20 @@ export default function AdminUsersPage() {
 
             if (response.success) {
                 setUsers(response.data.users);
-                setTotalPages(response.data.totalPages);
-                setTotalElements(response.data.totalElements);
+
+                const derivedTotalElements = response.data.totalElements >= 0
+                    ? response.data.totalElements
+                    : response.data.users.length;
+                const derivedTotalPages = response.data.totalPages && response.data.totalPages > 0
+                    ? response.data.totalPages
+                    : Math.max(1, Math.ceil(derivedTotalElements / pageSize));
+
+                setTotalPages(derivedTotalPages);
+                setTotalElements(derivedTotalElements);
+
+                if (currentPage >= derivedTotalPages) {
+                    setCurrentPage(Math.max(0, derivedTotalPages - 1));
+                }
             }
         } catch (error) {
             console.error('Failed to fetch users:', error);
@@ -125,6 +141,12 @@ export default function AdminUsersPage() {
         }
     };
 
+    const handlePageSizeChange = (value: number) => {
+        setPageSize(value);
+        setFilters(prev => ({ ...prev, size: value }));
+        setCurrentPage(0);
+    };
+
     const clearFilters = () => {
         setFilters({
             searchQuery: '',
@@ -133,6 +155,10 @@ export default function AdminUsersPage() {
             emailVerified: undefined,
             phoneVerified: undefined,
             twoFactorEnabled: undefined,
+            createdAfter: '',
+            createdBefore: '',
+            lastLoginAfter: '',
+            lastLoginBefore: '',
             socialProvider: '',
             isLocked: undefined,
             sortBy: 'createdAt',
@@ -141,6 +167,74 @@ export default function AdminUsersPage() {
             size: 20
         });
         setCurrentPage(0);
+        setPageSize(20);
+    };
+
+    const hasActiveFilters = useMemo(() => {
+        return Boolean(
+            filters.searchQuery?.trim() ||
+            filters.role ||
+            filters.socialProvider ||
+            filters.createdAfter ||
+            filters.createdBefore ||
+            filters.lastLoginAfter ||
+            filters.lastLoginBefore ||
+            filters.isActive !== undefined ||
+            filters.emailVerified !== undefined ||
+            filters.phoneVerified !== undefined ||
+            filters.twoFactorEnabled !== undefined ||
+            filters.isLocked !== undefined
+        );
+    }, [filters]);
+
+    const handleExport = () => {
+        if (!users.length) {
+            return;
+        }
+
+        const headers = [
+            'User ID',
+            'Name',
+            'Email',
+            'Role',
+            'Phone Number',
+            'Active',
+            'Email Verified',
+            'Phone Verified',
+            '2FA Enabled',
+            'Created At',
+            'Last Login At',
+            'Last Login IP'
+        ];
+
+        const rows = users.map(user => [
+            user.userId,
+            `"${user.name}"`,
+            user.email,
+            user.role,
+            user.phoneNumber || '',
+            user.isActive ? 'Yes' : 'No',
+            user.emailVerified ? 'Yes' : 'No',
+            user.phoneVerified ? 'Yes' : 'No',
+            user.twoFactorEnabled ? 'Yes' : 'No',
+            formatDate(new Date(user.createdAt), 'time'),
+            user.lastLoginAt ? formatDate(new Date(user.lastLoginAt), 'time') : '',
+            user.lastLoginIp || ''
+        ]);
+
+        const csvContent = [headers, ...rows]
+            .map(row => row.join(','))
+            .join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `users_${new Date().toISOString()}.csv`);
+        link.click();
+
+        URL.revokeObjectURL(url);
     };
 
     return (
@@ -159,7 +253,11 @@ export default function AdminUsersPage() {
                     >
                         <RefreshCw className={`w-5 h-5 ${statsLoading ? 'animate-spin' : ''}`} />
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        disabled={!users.length}
+                    >
                         <Download className="w-4 h-4" />
                         Export
                     </button>
@@ -234,6 +332,26 @@ export default function AdminUsersPage() {
                 </div>
             )}
 
+            {/* Users by Role */}
+            {statistics?.usersByRole && Object.keys(statistics.usersByRole).length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Role</h3>
+                    <div className="flex flex-wrap gap-3">
+                        {Object.entries(statistics.usersByRole).map(([role, count]) => (
+                            <div
+                                key={role}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 text-sm font-medium text-gray-700"
+                            >
+                                <UserCog className="w-4 h-4 text-gray-500" />
+                                <span>{role}</span>
+                                <span className="text-gray-500">•</span>
+                                <span>{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Search and Filters */}
             <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4">
@@ -255,7 +373,20 @@ export default function AdminUsersPage() {
                         Filters
                         <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
                     </button>
-                    {Object.values(filters).some(v => v !== '' && v !== undefined && v !== 'createdAt' && v !== 'desc' && v !== 0 && v !== 20) && (
+                    <div>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            {[10, 20, 30, 50].map(size => (
+                                <option key={size} value={size}>
+                                    Show {size}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
                             className="px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -328,6 +459,46 @@ export default function AdminUsersPage() {
                             <option value="true">Locked</option>
                             <option value="false">Unlocked</option>
                         </select>
+
+                        <input
+                            type="date"
+                            value={filters.createdAfter || ''}
+                            onChange={(e) => handleFilterChange('createdAfter', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Created After"
+                        />
+
+                        <input
+                            type="date"
+                            value={filters.createdBefore || ''}
+                            onChange={(e) => handleFilterChange('createdBefore', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Created Before"
+                        />
+
+                        <input
+                            type="date"
+                            value={filters.lastLoginAfter || ''}
+                            onChange={(e) => handleFilterChange('lastLoginAfter', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Last Login After"
+                        />
+
+                        <input
+                            type="date"
+                            value={filters.lastLoginBefore || ''}
+                            onChange={(e) => handleFilterChange('lastLoginBefore', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Last Login Before"
+                        />
+
+                        <input
+                            type="text"
+                            value={filters.socialProvider || ''}
+                            onChange={(e) => handleFilterChange('socialProvider', e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Social Provider"
+                        />
 
                         <select
                             value={filters.sortBy || 'createdAt'}
@@ -409,7 +580,7 @@ export default function AdminUsersPage() {
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-600">
-                                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalElements)} of {totalElements} users
+                                Showing {totalElements === 0 ? 0 : currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalElements || users.length)} of {totalElements || users.length} users
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
