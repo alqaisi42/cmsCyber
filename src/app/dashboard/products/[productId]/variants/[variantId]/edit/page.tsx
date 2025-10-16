@@ -3,9 +3,10 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
+import {useProduct, useProductVariant} from "../../../../../../../presentation/hooks/useProviders";
+import {ProductVariantForm} from "../../../../../../../presentation/components/products/ProductVariantForm";
 
-import { ProductVariantForm } from '../../../../../../presentation/components/products/ProductVariantForm';
-import { useProduct, useProductVariant } from '../../../../../../presentation/hooks/useProviders';
+
 
 export default function EditProductVariantPage() {
     const router = useRouter();
