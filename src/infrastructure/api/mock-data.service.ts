@@ -1,17 +1,51 @@
-// Mock Data Service - Generate dummy data for all entities
+// src/infrastructure/api/mock-data.service.ts
+// Mock Data Service - UPDATED FOR COMPATIBILITY
+
 import {
     User,
     UserRole,
     UserStatus,
     Provider,
     ProviderStatus,
-    Product,
     ProductStatus,
     Locker,
     LockerStatus,
     DashboardStats,
 } from '../../core/entities';
 import { PaginatedResponse } from '../../core/interfaces/repositories';
+
+// Old Product interface for mock data (different from API Product)
+interface MockProduct {
+    id: string;
+    name: string;
+    sku: string;
+    description: string;
+    price: number;
+    currency: string;
+    category: string;
+    providerId: string;
+    stock: number;
+    images: string[];
+    status: ProductStatus;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// Old Provider interface for mock data (different from API Provider)
+interface MockProvider {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    country: string;
+    status: ProviderStatus;
+    rating: number;
+    productsCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
 
 export class MockDataService {
     // Generate mock users
@@ -37,9 +71,9 @@ export class MockDataService {
         return users;
     }
 
-    // Generate mock providers
-    static generateProviders(count: number = 30): Provider[] {
-        const providers: Provider[] = [];
+    // Generate mock providers (old format)
+    static generateProviders(count: number = 30): MockProvider[] {
+        const providers: MockProvider[] = [];
         const cities = ['Amman', 'Zarqa', 'Irbid', 'Aqaba', 'Madaba', 'Salt'];
         const statuses = [ProviderStatus.ACTIVE, ProviderStatus.INACTIVE, ProviderStatus.PENDING];
 
@@ -64,9 +98,9 @@ export class MockDataService {
         return providers;
     }
 
-    // Generate mock products
-    static generateProducts(count: number = 100): Product[] {
-        const products: Product[] = [];
+    // Generate mock products (old format)
+    static generateProducts(count: number = 100): MockProduct[] {
+        const products: MockProduct[] = [];
         const categories = ['Electronics', 'Clothing', 'Food', 'Home', 'Sports', 'Books'];
         const statuses = [ProductStatus.ACTIVE, ProductStatus.INACTIVE, ProductStatus.OUT_OF_STOCK];
 
