@@ -1,13 +1,6 @@
-// src/presentation/hooks/useShop.ts
-// NEW hooks for shop management with React Query
+// src/infrastructure/services/shop-admin.service.ts
+// COMPLETE FIX - Handles API response structure correctly
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-    shopProviderService,
-    shopProductService,
-    productVariantService,
-    categoryService
-} from '../../infrastructure/services/shop-admin.service';
 import {
     ShopProvider,
     ShopProduct,
@@ -15,269 +8,312 @@ import {
     Category,
     CreateProductRequest,
     CreateVariantRequest,
-    ProductSearchParams
+    ProductSearchParams,
+    ProviderStatsResponse
 } from '../../core/entities/ecommerce';
-import {PaginatedResponse} from "../../core/interfaces/repositories";
+import { PaginatedResponse } from "../../core/interfaces/repositories";
 
 // ============================================================================
-// PROVIDER HOOKS
+// API RESPONSE TYPES
 // ============================================================================
 
-export function useProviders() {
-    return useQuery({
-        queryKey: ['providers'],
-        queryFn: async () => {
-            const response = await shopProviderService.getProviders();
-            return response.data;
-        }
-    });
+interface SpringBootPageResponse<T> {
+    content: T[];
+    pageable: {
+        pageNumber: number;
+        pageSize: number;
+    };
+    totalPages: number;
+    totalElements: number;
 }
 
-export function useProvider(id: string) {
-    return useQuery({
-        queryKey: ['provider', id],
-        queryFn: async () => {
-            const response = await shopProviderService.getProviderById(id);
-            return response.data;
-        },
-        enabled: !!id
-    });
-}
-
-export function useProviderProducts(
-    providerId: string,
-    page = 0,
-    size = 20
-) {
-    return useQuery({
-        queryKey: ['provider-products', providerId, page, size],
-        queryFn: async (): Promise<PaginatedResponse<ShopProduct>> => {
-            const response = await shopProviderService.getProviderProducts(providerId, page, size);
-
-            // Ensure normalized structure regardless of backend format
-            const data = (response?.data ?? []) as ShopProduct[];
-
-            return {
-                data,
-                total: response?.total ?? data.length,
-                totalPages: response?.totalPages ?? 1,
-                page,
-                limit: size,
-            };
-        },
-        enabled: !!providerId,
-    });
-}
-
-
-
-export function useCreateProvider() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>) =>
-            shopProviderService.createProvider(provider),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-        }
-    });
-}
-
-export function useUpdateProvider() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<ShopProvider> }) =>
-            shopProviderService.updateProvider(id, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-            queryClient.invalidateQueries({ queryKey: ['provider', variables.id] });
-        }
-    });
-}
-
-export function useToggleProviderStatus() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-            shopProviderService.toggleProviderStatus(id, isActive),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-        }
-    });
+interface ApiResponse<T> {
+    success: boolean;
+    data: T;
+    message?: string;
+    errors?: string[];
+    timestamp?: string;
 }
 
 // ============================================================================
-// PRODUCT HOOKS
+// TRANSFORM FUNCTION
 // ============================================================================
 
-export function useProduct(id: string) {
-    return useQuery({
-        queryKey: ['product', id],
-        queryFn: async () => {
-            const response = await shopProductService.getProductById(id);
-            return response.data;
-        },
-        enabled: !!id
-    });
-}
-
-export function useSearchProducts(params: ProductSearchParams) {
-    return useQuery({
-        queryKey: ['products', 'search', params],
-        queryFn: async () => {
-            const response = await shopProductService.searchProducts(params);
-            return response.data;
-        }
-    });
-}
-
-export function useCreateProduct() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (request: CreateProductRequest) =>
-            shopProductService.createProduct(request),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['provider-products'] });
-        }
-    });
-}
-
-export function useUpdateProduct() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<ShopProduct> }) =>
-            shopProductService.updateProduct(id, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['product', variables.id] });
-        }
-    });
-}
-
-export function useDeleteProduct() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (id: string) => shopProductService.deleteProduct(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-        }
-    });
+function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<T>): PaginatedResponse<T> {
+    return {
+        data: springResponse.content || [],
+        total: springResponse.totalElements || 0,
+        page: springResponse.pageable?.pageNumber || 0,
+        limit: springResponse.pageable?.pageSize || 20,
+        totalPages: springResponse.totalPages || 0
+    };
 }
 
 // ============================================================================
-// VARIANT HOOKS
+// PROVIDER SERVICE
 // ============================================================================
 
-export function useProductVariants(productId: string) {
-    return useQuery({
-        queryKey: ['product-variants', productId],
-        queryFn: async () => {
-            const response = await productVariantService.getProductVariants(productId);
-            return response.data;
-        },
-        enabled: !!productId
-    });
-}
+class ShopProviderService {
+    private readonly baseUrl = '/api/v1/providers';
 
-export function useCreateVariant() {
-    const queryClient = useQueryClient();
+    async getProviders(): Promise<ApiResponse<ProviderStatsResponse[]>> {
+        const response = await fetch(this.baseUrl, {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
 
-    return useMutation({
-        mutationFn: ({ productId, variant }: { productId: string; variant: CreateVariantRequest }) =>
-            productVariantService.createVariant(productId, variant),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants', variables.productId] });
-            queryClient.invalidateQueries({ queryKey: ['product', variables.productId] });
+    async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * ✅ FIXED: Properly handles nested response structure
+     * Backend returns: { success: true, data: { content: [...], totalElements: 156 } }
+     * We transform to: { data: [...], total: 156, totalPages: 8, page: 0, limit: 20 }
+     */
+    async getProviderProducts(
+        providerId: string,
+        page: number = 0,
+        size: number = 20
+    ): Promise<PaginatedResponse<ShopProduct>> {
+        const url = `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`;
+
+        console.log('🔵 Fetching provider products:', url);
+
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    });
-}
 
-export function useUpdateVariant() {
-    const queryClient = useQueryClient();
+        // Get the wrapped response
+        const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<ProductVariant> }) =>
-            productVariantService.updateVariant(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants'] });
-        }
-    });
-}
+        console.log('🔵 Raw API Response:', apiResponse);
+        console.log('🔵 Nested data:', apiResponse.data);
 
-export function useDeleteVariant() {
-    const queryClient = useQueryClient();
+        // Transform the nested Spring Boot response to our format
+        const transformed = transformToPaginatedResponse(apiResponse.data);
 
-    return useMutation({
-        mutationFn: (id: string) => productVariantService.deleteVariant(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants'] });
-        }
-    });
-}
+        console.log('✅ Transformed Response:', transformed);
 
-export function useUpdateVariantStock() {
-    const queryClient = useQueryClient();
+        return transformed;
+    }
 
-    return useMutation({
-        mutationFn: ({ id, quantity }: { id: string; quantity: number }) =>
-            productVariantService.updateStock(id, quantity),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants'] });
-        }
-    });
+    async createProvider(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ShopProvider>> {
+        const response = await fetch(this.baseUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(provider)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async updateProvider(id: string, provider: Partial<ShopProvider>): Promise<ApiResponse<ShopProvider>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(provider)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async toggleProviderStatus(id: string, isActive: boolean): Promise<ApiResponse<ShopProvider>> {
+        return this.updateProvider(id, { isActive });
+    }
 }
 
 // ============================================================================
-// CATEGORY HOOKS
+// PRODUCT SERVICE
 // ============================================================================
 
-export function useCategories() {
-    return useQuery({
-        queryKey: ['categories'],
-        queryFn: async () => {
-            const response = await categoryService.getCategories();
-            return response.data;
-        }
-    });
+class ShopProductService {
+    private readonly baseUrl = '/api/v1/products';
+
+    async createProduct(request: CreateProductRequest): Promise<ApiResponse<{ id: string }>> {
+        const response = await fetch(this.baseUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async getProductById(id: string): Promise<ApiResponse<ShopProduct>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async updateProduct(id: string, product: Partial<ShopProduct>): Promise<ApiResponse<ShopProduct>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async deleteProduct(id: string): Promise<ApiResponse<void>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * ✅ FIXED: Search products with proper transformation
+     */
+    async searchProducts(params: ProductSearchParams): Promise<PaginatedResponse<ShopProduct>> {
+        const queryParams = new URLSearchParams();
+        if (params.keyword) queryParams.append('keyword', params.keyword);
+        if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+        if (params.providerId) queryParams.append('providerId', params.providerId);
+        if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
+        if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
+        if (params.isOnSale !== undefined) queryParams.append('isOnSale', params.isOnSale.toString());
+        if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+        queryParams.append('page', params.page.toString());
+        queryParams.append('size', params.size.toString());
+
+        const response = await fetch(`${this.baseUrl}/search?${queryParams.toString()}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
+        return transformToPaginatedResponse(apiResponse.data);
+    }
 }
 
-export function useCreateCategory() {
-    const queryClient = useQueryClient();
+// ============================================================================
+// VARIANT SERVICE
+// ============================================================================
 
-    return useMutation({
-        mutationFn: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) =>
-            categoryService.createCategory(category),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-        }
-    });
+class ProductVariantService {
+    /**
+     * Get all variants for a product
+     */
+    async getProductVariants(productId: string): Promise<ApiResponse<ProductVariant[]>> {
+        const response = await fetch(`/api/v1/products/${productId}/variants`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Create a new variant
+     */
+    async createVariant(productId: string, request: CreateVariantRequest): Promise<ApiResponse<ProductVariant>> {
+        const response = await fetch(`/api/v1/products/${productId}/variants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Update a variant
+     */
+    async updateVariant(variantId: string, variant: Partial<ProductVariant>): Promise<ApiResponse<ProductVariant>> {
+        const response = await fetch(`/api/v1/variants/${variantId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(variant)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Delete a variant
+     */
+    async deleteVariant(variantId: string): Promise<ApiResponse<void>> {
+        const response = await fetch(`/api/v1/variants/${variantId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
 }
 
-export function useUpdateCategory() {
-    const queryClient = useQueryClient();
+// ============================================================================
+// CATEGORY SERVICE
+// ============================================================================
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<Category> }) =>
-            categoryService.updateCategory(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-        }
-    });
+class CategoryService {
+    private readonly baseUrl = '/api/v1/categories';
+
+    async getCategories(): Promise<ApiResponse<Category[]>> {
+        const response = await fetch(this.baseUrl, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async getCategoryById(id: string): Promise<ApiResponse<Category>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>): Promise<ApiResponse<Category>> {
+        const response = await fetch(this.baseUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(category)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async updateCategory(id: string, category: Partial<Category>): Promise<ApiResponse<Category>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(category)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async deleteCategory(id: string): Promise<ApiResponse<void>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
 }
 
-export function useDeleteCategory() {
-    const queryClient = useQueryClient();
+// ============================================================================
+// EXPORT SINGLETONS
+// ============================================================================
 
-    return useMutation({
-        mutationFn: (id: string) => categoryService.deleteCategory(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-        }
-    });
-}
+export const shopProviderService = new ShopProviderService();
+export const shopProductService = new ShopProductService();
+export const productVariantService = new ProductVariantService();
+export const categoryService = new CategoryService();

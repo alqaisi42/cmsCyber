@@ -9,6 +9,58 @@ import {
     DashboardStats
 } from '../entities';
 
+// src/core/types/api.ts
+// NEW FILE - Centralized API response types
+
+/**
+ * Standard API Response wrapper from backend
+ */
+export interface ApiResponse<T> {
+    success: boolean;
+    data: T;
+    message: string;
+    errors?: string[];
+    timestamp: string;
+}
+
+/**
+ * Spring Boot Page Response (from backend pagination)
+ */
+export interface SpringBootPageResponse<T> {
+    content: T[];
+    pageable: {
+        pageNumber: number;
+        pageSize: number;
+        sort?: {
+            sorted: boolean;
+            unsorted: boolean;
+        };
+        offset: number;
+    };
+    totalPages: number;
+    totalElements: number;
+    size: number;
+    number: number;
+    first: boolean;
+    last: boolean;
+    numberOfElements: number;
+    empty: boolean;
+}
+
+/**
+ * Transform Spring Boot response to our PaginatedResponse format
+ */
+export function transformSpringPageToPaginated<T>(
+    springResponse: SpringBootPageResponse<T>
+): import('../interfaces/repositories').PaginatedResponse<T> {
+    return {
+        data: springResponse.content,
+        total: springResponse.totalElements,
+        page: springResponse.number,
+        limit: springResponse.size,
+        totalPages: springResponse.totalPages
+    };
+}
 
 export interface PaginationParams {
     page: number;

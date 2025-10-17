@@ -1,5 +1,5 @@
 // src/infrastructure/services/shop-admin.service.ts
-// FIXED VERSION with proper type returns
+// COMPLETE FIX - Handles API response structure correctly
 
 import {
     ShopProvider,
@@ -11,9 +11,7 @@ import {
     ProductSearchParams,
     ProviderStatsResponse
 } from '../../core/entities/ecommerce';
-import {PaginatedResponse} from "../../core/interfaces/repositories";
-
-// Import from base repository (single source of truth)
+import { PaginatedResponse } from "../../core/interfaces/repositories";
 
 // ============================================================================
 // API RESPONSE TYPES
@@ -32,19 +30,22 @@ interface SpringBootPageResponse<T> {
 interface ApiResponse<T> {
     success: boolean;
     data: T;
-    message: string;
+    message?: string;
     errors?: string[];
-    timestamp: string;
+    timestamp?: string;
 }
 
-// Transform Spring Boot response to PaginatedResponse
+// ============================================================================
+// TRANSFORM FUNCTION
+// ============================================================================
+
 function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<T>): PaginatedResponse<T> {
     return {
-        data: springResponse.content,
-        total: springResponse.totalElements,
-        page: springResponse.pageable.pageNumber,
-        limit: springResponse.pageable.pageSize,
-        totalPages: springResponse.totalPages
+        data: springResponse.content || [],
+        total: springResponse.totalElements || 0,
+        page: springResponse.pageable?.pageNumber || 0,
+        limit: springResponse.pageable?.pageSize || 20,
+        totalPages: springResponse.totalPages || 0
     };
 }
 
@@ -57,34 +58,56 @@ class ShopProviderService {
 
     async getProviders(): Promise<ApiResponse<ProviderStatsResponse[]>> {
         const response = await fetch(this.baseUrl, {
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
     async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
-        const response = await fetch(`${this.baseUrl}/${id}`);
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
-    // ✅ FIXED: Returns PaginatedResponse directly (not wrapped in ApiResponse)
+    /**
+     * ✅ FIXED: Properly handles nested response structure
+     * Backend returns: { success: true, data: { content: [...], totalElements: 156 } }
+     * We transform to: { data: [...], total: 156, totalPages: 8, page: 0, limit: 20 }
+     */
     async getProviderProducts(
         providerId: string,
         page: number = 0,
         size: number = 20
     ): Promise<PaginatedResponse<ShopProduct>> {
-        const response = await fetch(
-            `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`
-        );
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const url = `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`;
 
-        // Backend returns: { success: true, data: { content: [...], totalElements: 156, ... } }
+        console.log('🔵 Fetching provider products:', url);
+
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Get the wrapped response
         const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
 
-        // Transform and return PaginatedResponse directly
-        return transformToPaginatedResponse(apiResponse.data);
+        console.log('🔵 Raw API Response:', apiResponse);
+        console.log('🔵 Nested data:', apiResponse.data);
+
+        // Transform the nested Spring Boot response to our format
+        const transformed = transformToPaginatedResponse(apiResponse.data);
+
+        console.log('✅ Transformed Response:', transformed);
+
+        return transformed;
     }
 
     async createProvider(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ShopProvider>> {
@@ -130,7 +153,9 @@ class ShopProductService {
     }
 
     async getProductById(id: string): Promise<ApiResponse<ShopProduct>> {
-        const response = await fetch(`${this.baseUrl}/${id}`);
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
@@ -153,7 +178,9 @@ class ShopProductService {
         return response.json();
     }
 
-    // ✅ FIXED: Returns PaginatedResponse directly
+    /**
+     * ✅ FIXED: Search products with proper transformation
+     */
     async searchProducts(params: ProductSearchParams): Promise<PaginatedResponse<ShopProduct>> {
         const queryParams = new URLSearchParams();
         if (params.keyword) queryParams.append('keyword', params.keyword);
@@ -166,7 +193,9 @@ class ShopProductService {
         queryParams.append('page', params.page.toString());
         queryParams.append('size', params.size.toString());
 
-        const response = await fetch(`${this.baseUrl}/search?${queryParams.toString()}`);
+        const response = await fetch(`${this.baseUrl}/search?${queryParams.toString()}`, {
+            cache: 'no-store'
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
@@ -179,29 +208,34 @@ class ShopProductService {
 // ============================================================================
 
 class ProductVariantService {
+    /**
+     * Get all variants for a product
+     */
     async getProductVariants(productId: string): Promise<ApiResponse<ProductVariant[]>> {
-        const response = await fetch(`/api/v1/products/${productId}/variants`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async createVariant(
-        productId: string,
-        variant: CreateVariantRequest
-    ): Promise<ApiResponse<{ id: string }>> {
         const response = await fetch(`/api/v1/products/${productId}/variants`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(variant)
+            cache: 'no-store'
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
-    async updateVariant(
-        variantId: string,
-        variant: Partial<ProductVariant>
-    ): Promise<ApiResponse<ProductVariant>> {
+    /**
+     * Create a new variant
+     */
+    async createVariant(productId: string, request: CreateVariantRequest): Promise<ApiResponse<ProductVariant>> {
+        const response = await fetch(`/api/v1/products/${productId}/variants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Update a variant
+     */
+    async updateVariant(variantId: string, variant: Partial<ProductVariant>): Promise<ApiResponse<ProductVariant>> {
         const response = await fetch(`/api/v1/variants/${variantId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -211,16 +245,15 @@ class ProductVariantService {
         return response.json();
     }
 
+    /**
+     * Delete a variant
+     */
     async deleteVariant(variantId: string): Promise<ApiResponse<void>> {
         const response = await fetch(`/api/v1/variants/${variantId}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
-    }
-
-    async updateStock(variantId: string, quantity: number): Promise<ApiResponse<ProductVariant>> {
-        return this.updateVariant(variantId, { stockQuantity: quantity });
     }
 }
 
@@ -232,12 +265,22 @@ class CategoryService {
     private readonly baseUrl = '/api/v1/categories';
 
     async getCategories(): Promise<ApiResponse<Category[]>> {
-        const response = await fetch(this.baseUrl);
+        const response = await fetch(this.baseUrl, {
+            cache: 'no-store'
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
-    async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Category>> {
+    async getCategoryById(id: string): Promise<ApiResponse<Category>> {
+        const response = await fetch(`${this.baseUrl}/${id}`, {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>): Promise<ApiResponse<Category>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -267,7 +310,7 @@ class CategoryService {
 }
 
 // ============================================================================
-// EXPORTS
+// EXPORT SINGLETONS
 // ============================================================================
 
 export const shopProviderService = new ShopProviderService();
