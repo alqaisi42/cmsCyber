@@ -202,11 +202,12 @@ class ShopProductService {
      * Get product by ID
      */
     async getProductById(id: string): Promise<ApiResponse<ShopProductDetail>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
+        const response = await fetch(`${this.baseUrl}/${id}`, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        // Explicitly cast to ApiResponse<ShopProductDetail>
+        return (await response.json()) as ApiResponse<ShopProductDetail>;
     }
 
     /**

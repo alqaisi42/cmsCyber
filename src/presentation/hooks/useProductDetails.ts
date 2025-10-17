@@ -11,7 +11,7 @@ import {
     ProductImage,
     GroupedImages
 } from '../../infrastructure/services/product-image.service';
-import { ShopProductDetail, ProductVariant } from '../../core/entities/ecommerce';
+import {ProductVariant, ShopProductDetail} from '../../core/entities/ecommerce';
 
 // =============================================================================
 // PRODUCT IMAGES HOOK

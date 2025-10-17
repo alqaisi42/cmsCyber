@@ -32,38 +32,38 @@ const navigationItems = [
         href: '/dashboard/admin/users',
         icon: UserCog,
     },
-    {
-        title: 'Users',
-        href: '/dashboard/users',
-        icon: Users,
-    },
+    // {
+    //     title: 'Users',
+    //     href: '/dashboard/users',
+    //     icon: Users,
+    // },
     // Shop Management Section
     {
         title: 'Shop Providers',
         href: '/dashboard/shop/providers',
         icon: Store,
     },
-    {
-        title: 'Shop Products',
-        href: '/dashboard/shop/products',
-        icon: Package,
-    },
+    // {
+    //     title: 'Shop Products',
+    //     href: '/dashboard/shop/products',
+    //     icon: Package,
+    // },
     {
         title: 'Categories',
         href: '/dashboard/shop/categories',
         icon: Tag,
     },
     // Other sections
-    {
-        title: 'Providers',
-        href: '/dashboard/providers',
-        icon: Store,
-    },
-    {
-        title: 'Products',
-        href: '/dashboard/products',
-        icon: Package,
-    },
+    // {
+    //     title: 'Providers',
+    //     href: '/dashboard/providers',
+    //     icon: Store,
+    // },
+    // {
+    //     title: 'Products',
+    //     href: '/dashboard/products',
+    //     icon: Package,
+    // },
     {
         title: 'Lockers',
         href: '/dashboard/lockers',

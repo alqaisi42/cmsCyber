@@ -17,10 +17,11 @@ import {
     Tag,
     XCircle,
 } from 'lucide-react';
-import { Image360Viewer } from '@/presentation/components/shop/Image360Viewer';
-import { useProductDetails } from '@/presentation/hooks/useProductDetails';
-import { collectVariantMedia } from '@/presentation/utils/variantMedia';
-import type { ProductImage } from '@/infrastructure/services/product-image.service';
+import {useProductDetails} from "../../../../../presentation/hooks/useProductDetails";
+import {ProductImage} from "../../../../../infrastructure/services/product-image.service";
+import {collectVariantMedia} from "../../../../../presentation/utils/variantMedia";
+import {Image360Viewer} from "../../../../../presentation/components/shop/Image360Viewer";
+
 
 function formatCurrency(value: number | null | undefined) {
     if (value === null || value === undefined || Number.isNaN(value)) {
@@ -105,20 +106,15 @@ export default function ProviderProductDetailPage() {
 
     const galleryImages = useMemo(() => {
         const variantGallery = selectedVariantMedia.allImages.filter(
-            (image) => image.imageType !== '360' && image.imageType !== 'rotation360'
+            (image) => !['360', 'rotation360'].includes(image.imageType as string)
         );
 
-        if (variantGallery.length > 0) {
-            return variantGallery;
-        }
-
-        if (groupedImages?.allRegular?.length) {
-            return groupedImages.allRegular;
-        }
-
-        if (images.length > 0) {
-            return images.filter((image) => image.imageType !== '360' && image.imageType !== 'rotation360');
-        }
+        if (variantGallery.length > 0) return variantGallery;
+        if (groupedImages?.allRegular?.length) return groupedImages.allRegular;
+        if (images.length > 0)
+            return images.filter(
+                (image) => !['360', 'rotation360'].includes(image.imageType as string)
+            );
 
         return [] as ProductImage[];
     }, [selectedVariantMedia.allImages, groupedImages?.allRegular, images]);
