@@ -11,13 +11,22 @@ export async function GET(request: NextRequest) {
     try {
         const response = await fetch(`${BACKEND_URL}/api/v1/providers`, {
             headers: {
-                'Accept': 'application/json',
+                Accept: 'application/json',
             },
+            cache: 'no-store',
         });
 
         if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+
+            console.error('Provider API Error Response:', errorText);
+
             return NextResponse.json(
-                { success: false, message: 'Failed to fetch providers' },
+                {
+                    success: false,
+                    message: 'Failed to fetch providers',
+                    error: errorText || undefined,
+                },
                 { status: response.status }
             );
         }

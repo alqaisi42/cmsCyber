@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle, ArrowLeft, Loader2, PackagePlus } from 'lucide-react';
-import { useProviderById } from '@/presentation/hooks/useShop';
+import { useProviderById, useProviders } from '@/presentation/hooks/useShop';
 import { ProductForm } from '@/presentation/components/shop/ProductForm';
 
 export default function CreateProviderProductPage() {
@@ -11,6 +11,14 @@ export default function CreateProviderProductPage() {
     const providerId = params.providerId as string;
 
     const { data: provider, isLoading, error } = useProviderById(providerId);
+    const { data: providers } = useProviders();
+
+    const providerFromList = providers?.find((item) => item.id === providerId) ?? null;
+    const resolvedProvider = provider ?? providerFromList;
+    const providerName = resolvedProvider?.name ?? 'this provider';
+    const providerIdentifier = resolvedProvider?.id ?? providerId;
+    const providerError = error instanceof Error ? error.message : null;
+    const showLoadingState = isLoading && !resolvedProvider;
 
     const handleSuccess = () => {
         router.push(`/dashboard/shop/providers/${providerId}/products`);
@@ -34,30 +42,35 @@ export default function CreateProviderProductPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                {isLoading && (
+                {showLoadingState && (
                     <div className="flex items-center justify-center py-12 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mr-2" />
                         Loading provider details...
                     </div>
                 )}
 
-                {!isLoading && error && (
+                {!showLoadingState && providerError && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 mt-0.5" />
                         <div>
                             <p className="font-semibold">Unable to load provider information</p>
-                            <p>{error instanceof Error ? error.message : 'An unexpected error occurred.'}</p>
+                            <p>{providerError}</p>
+                            {providerFromList && (
+                                <p className="mt-2 text-xs text-red-600">
+                                    Showing cached provider info. Please double-check before submitting.
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {!isLoading && provider && (
+                {!showLoadingState && (
                     <div className="space-y-8">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                                     <PackagePlus className="w-6 h-6 text-blue-600" />
-                                    Add a product for {provider.name}
+                                    Add a product for {providerName}
                                 </h1>
                                 <p className="text-sm text-slate-600 mt-2 max-w-2xl">
                                     Capture rich product information, attach media assets (including rotation frames), and configure
@@ -66,12 +79,12 @@ export default function CreateProviderProductPage() {
                             </div>
                             <div className="text-right text-sm text-slate-500">
                                 <p>Provider ID</p>
-                                <p className="font-semibold text-slate-900">{provider.id}</p>
+                                <p className="font-semibold text-slate-900">{providerIdentifier}</p>
                             </div>
                         </div>
 
                         <ProductForm
-                            initialProviderId={provider.id}
+                            initialProviderId={providerIdentifier}
                             onCancel={handleCancel}
                             onSuccess={handleSuccess}
                         />
