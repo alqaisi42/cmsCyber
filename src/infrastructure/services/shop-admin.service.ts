@@ -6,6 +6,7 @@
 import {
     ShopProvider,
     ShopProduct,
+    ShopProductDetail,
     ProductVariant,
     Category,
     CreateProductRequest,
@@ -200,7 +201,7 @@ class ShopProductService {
     /**
      * Get product by ID
      */
-    async getProductById(id: string): Promise<ApiResponse<ShopProduct>> {
+    async getProductById(id: string): Promise<ApiResponse<ShopProductDetail>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             cache: 'no-store'
         });

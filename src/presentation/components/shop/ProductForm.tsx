@@ -3,7 +3,6 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +14,11 @@ import { CreateProductRequest } from '../../../core/entities/ecommerce';
 import { useCategories, useProviders, useCreateProduct } from '../../hooks/useShop';
 
 // Validation Schema
+const optionalNumberField = z
+    .union([z.number(), z.nan()])
+    .transform((value) => (Number.isNaN(value) ? undefined : value))
+    .optional();
+
 const variantSchema = z.object({
     size: z.string().min(1, 'Size is required'),
     color: z.string().min(1, 'Color is required'),
@@ -22,19 +26,21 @@ const variantSchema = z.object({
     basePrice: z.number().min(0, 'Price must be positive'),
     priceAdjustment: z.number().default(0),
     stockQuantity: z.number().min(0, 'Stock must be non-negative'),
-    lowStockThreshold: z.number().min(0).default(5),
+    lowStockThreshold: z.number().min(0, 'Low stock threshold must be non-negative').default(5),
     isAvailable: z.boolean().default(true),
     barcode: z.string().optional(),
-    weight: z.number().optional(),
+    weight: optionalNumberField,
     inStockNo: z.string().optional()
 });
 
 const imageSchema = z.object({
     imageUrl: z.string().url('Invalid URL'),
-    imageType: z.enum(['regular', '360', 'thumbnail']),
-    sequenceOrder: z.number(),
+    imageType: z.enum(['regular', 'rotation360', '360', 'thumbnail']),
+    sequenceOrder: z.number().min(0, 'Sequence order must be zero or greater'),
     isPrimary: z.boolean(),
-    associatedColor: z.string().optional()
+    associatedColor: z.string().optional(),
+    variantId: z.string().optional(),
+    rotationFrameNumber: optionalNumberField,
 });
 
 const productSchema = z.object({
@@ -83,15 +89,21 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
                     priceAdjustment: 0,
                     stockQuantity: 0,
                     lowStockThreshold: 5,
-                    isAvailable: true
+                    isAvailable: true,
+                    barcode: '',
+                    weight: undefined,
+                    inStockNo: ''
                 }
             ],
             images: [
                 {
                     imageUrl: '',
                     imageType: 'regular',
-                    sequenceOrder: 0,
-                    isPrimary: true
+                    sequenceOrder: 1,
+                    isPrimary: true,
+                    associatedColor: '',
+                    variantId: '',
+                    rotationFrameNumber: undefined
                 }
             ]
         }
@@ -109,7 +121,43 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
 
     const onSubmit = async (data: ProductFormData) => {
         try {
-            await createProduct.mutateAsync(data as CreateProductRequest);
+            const formattedData: CreateProductRequest = {
+                ...data,
+                providerId: data.providerId.trim(),
+                categoryId: data.categoryId.trim(),
+                brandName: data.brandName?.trim() || undefined,
+                variants: data.variants.map((variant) => ({
+                    ...variant,
+                    barcode: variant.barcode?.trim() ? variant.barcode.trim() : undefined,
+                    inStockNo: variant.inStockNo?.trim() ? variant.inStockNo.trim() : undefined,
+                    weight:
+                        typeof variant.weight === 'number' && !Number.isNaN(variant.weight)
+                            ? variant.weight
+                            : undefined,
+                })),
+                images: data.images.map((image, index) => {
+                    const normalizedType = image.imageType === '360' ? 'rotation360' : image.imageType;
+
+                    const rotationFrame =
+                        typeof image.rotationFrameNumber === 'number' && !Number.isNaN(image.rotationFrameNumber)
+                            ? image.rotationFrameNumber
+                            : undefined;
+
+                    return {
+                        ...image,
+                        imageType: normalizedType,
+                        sequenceOrder:
+                            typeof image.sequenceOrder === 'number' && !Number.isNaN(image.sequenceOrder)
+                                ? image.sequenceOrder
+                                : index + 1,
+                        associatedColor: image.associatedColor?.trim() ? image.associatedColor.trim() : undefined,
+                        variantId: image.variantId?.trim() ? image.variantId.trim() : undefined,
+                        rotationFrameNumber: rotationFrame,
+                    };
+                }),
+            };
+
+            await createProduct.mutateAsync(formattedData);
             onSuccess?.();
         } catch (error) {
             console.error('Failed to create product:', error);
@@ -254,26 +302,29 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
                             color: '',
                             sku: '',
                             basePrice: watch('basePrice') || 0,
-                            priceAdjustment: 0,
-                            stockQuantity: 0,
-                            lowStockThreshold: 5,
-                            isAvailable: true
-                        })}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Variant
+                    priceAdjustment: 0,
+                    stockQuantity: 0,
+                    lowStockThreshold: 5,
+                    isAvailable: true,
+                    barcode: '',
+                    weight: undefined,
+                    inStockNo: ''
+                })}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
+            >
+                <Plus className="w-4 h-4" />
+                Add Variant
                     </button>
                 </div>
 
                 <div className="space-y-4">
                     {variantFields.map((field, index) => (
-                        <div key={field.id} className="border border-slate-200 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-medium text-slate-900">Variant #{index + 1}</h4>
-                                {index > 0 && (
-                                    <button
-                                        type="button"
+                    <div key={field.id} className="border border-slate-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-slate-900">Variant #{index + 1}</h4>
+                            {index > 0 && (
+                                <button
+                                    type="button"
                                         onClick={() => removeVariant(index)}
                                         className="p-1 text-red-600 hover:bg-red-50 rounded"
                                     >
@@ -320,6 +371,22 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
 
                                 <div>
                                     <label className="block text-xs font-medium text-slate-700 mb-1">
+                                        Base Price *
+                                    </label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            {...register(`variants.${index}.basePrice`, { valueAsNumber: true })}
+                                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">
                                         Stock Quantity *
                                     </label>
                                     <input
@@ -353,6 +420,52 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
                                         placeholder="123456789"
                                     />
                                 </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                                        Low Stock Threshold
+                                    </label>
+                                    <input
+                                        type="number"
+                                        {...register(`variants.${index}.lowStockThreshold`, { valueAsNumber: true })}
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="5"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                                        Weight (g)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        {...register(`variants.${index}.weight`, { valueAsNumber: true })}
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Optional"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                                        Inventory Ref.
+                                    </label>
+                                    <input
+                                        {...register(`variants.${index}.inStockNo`)}
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="e.g., WH-A-001"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between mt-3">
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        {...register(`variants.${index}.isAvailable`)}
+                                        className="w-4 h-4 text-blue-600 border-slate-300 rounded"
+                                    />
+                                    Available for sale
+                                </label>
                             </div>
                         </div>
                     ))}
@@ -371,8 +484,11 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
                         onClick={() => appendImage({
                             imageUrl: '',
                             imageType: 'regular',
-                            sequenceOrder: imageFields.length,
-                            isPrimary: false
+                            sequenceOrder: imageFields.length + 1,
+                            isPrimary: false,
+                            associatedColor: '',
+                            variantId: '',
+                            rotationFrameNumber: undefined
                         })}
                         className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
                     >
@@ -382,44 +498,85 @@ export function ProductForm({ onSuccess, onCancel, initialProviderId }: ProductF
                 </div>
 
                 <div className="space-y-3">
-                    {imageFields.map((field, index) => (
-                        <div key={field.id} className="flex items-center gap-3 border border-slate-200 rounded-lg p-3">
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="md:col-span-2">
+                    {imageFields.map((field, index) => {
+                        const imageType = watch(`images.${index}.imageType`);
+
+                        return (
+                            <div key={field.id} className="border border-slate-200 rounded-lg p-3 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                                    <div className="md:col-span-2">
+                                        <input
+                                            {...register(`images.${index}.imageUrl`)}
+                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="https://example.com/image.jpg"
+                                        />
+                                    </div>
+                                    <select
+                                        {...register(`images.${index}.imageType`)}
+                                        className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        <option value="regular">Regular</option>
+                                        <option value="rotation360">360° Rotation</option>
+                                        <option value="360">360° (legacy)</option>
+                                        <option value="thumbnail">Thumbnail</option>
+                                    </select>
                                     <input
-                                        {...register(`images.${index}.imageUrl`)}
-                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="https://example.com/image.jpg"
+                                        type="number"
+                                        {...register(`images.${index}.sequenceOrder`, { valueAsNumber: true })}
+                                        className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Order"
+                                    />
+                                    <input
+                                        {...register(`images.${index}.associatedColor`)}
+                                        className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Color tag"
+                                    />
+                                    <input
+                                        {...register(`images.${index}.variantId`)}
+                                        className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Variant ID"
                                     />
                                 </div>
-                                <select
-                                    {...register(`images.${index}.imageType`)}
-                                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                >
-                                    <option value="regular">Regular</option>
-                                    <option value="360">360°</option>
-                                    <option value="thumbnail">Thumbnail</option>
-                                </select>
+
+                                {imageType === 'rotation360' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
+                                        <div>
+                                            <input
+                                                type="number"
+                                                {...register(`images.${index}.rotationFrameNumber`, { valueAsNumber: true })}
+                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                placeholder="Frame number"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-slate-500">
+                                            Frame numbers ensure the 360° viewer keeps images in the correct rotation order.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            {...register(`images.${index}.isPrimary`)}
+                                            className="w-4 h-4 text-blue-600 border-slate-300 rounded"
+                                        />
+                                        Primary image
+                                    </label>
+
+                                    {index > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(index)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <label className="flex items-center gap-2 text-sm text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    {...register(`images.${index}.isPrimary`)}
-                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded"
-                                />
-                                Primary
-                            </label>
-                            {index > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => removeImage(index)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 

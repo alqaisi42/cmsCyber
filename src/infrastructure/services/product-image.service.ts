@@ -95,7 +95,7 @@ class ProductImageService {
             }
 
             // Separate 360 and regular images
-            if (img.imageType === '360') {
+            if (img.imageType === '360' || img.imageType === 'rotation360') {
                 grouped.all360.push(img);
             } else if (img.imageType === 'regular') {
                 grouped.allRegular.push(img);
@@ -118,7 +118,7 @@ class ProductImageService {
      * Get 360 images for rotation view
      */
     get360Images(images: ProductImage[], variantId?: string, color?: string): ProductImage[] {
-        let filtered = images.filter(img => img.imageType === '360');
+        let filtered = images.filter(img => img.imageType === '360' || img.imageType === 'rotation360');
 
         if (variantId) {
             filtered = filtered.filter(img => img.variantId === variantId);

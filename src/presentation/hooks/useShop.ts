@@ -13,6 +13,7 @@ import {
 import {
     ShopProvider,
     ShopProduct,
+    ShopProductDetail,
     ProductVariant,
     Category,
     CreateProductRequest,
@@ -20,7 +21,7 @@ import {
     ProductSearchParams,
     ProviderStatsResponse,
 } from '../../core/entities/ecommerce';
-import { PaginatedResponse } from '../../core/interfaces/repositories';
+import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 
 // =============================================================================
 // PROVIDER HOOKS
@@ -114,7 +115,7 @@ export function useToggleProviderStatus() {
 // =============================================================================
 
 export function useProductById(productId: string) {
-    return useQuery({
+    return useQuery<ApiResponse<ShopProductDetail>, Error>({
         queryKey: ['product', productId],
         queryFn: async () => {
             const response = await shopProductService.getProductById(productId);

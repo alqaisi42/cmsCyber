@@ -53,6 +53,36 @@ export interface Category extends BaseEntity {
 // PRODUCT
 // ============================================================================
 
+export interface ProductCategorySummary {
+    id: string;
+    name: string;
+    code: string;
+    description: string | null;
+    iconUrl: string | null;
+    parentId: string | null;
+    parentName: string | null;
+    displayOrder: number;
+    isActive: boolean;
+    productCount: number | null;
+    subcategories: ProductCategorySummary[];
+    createdAt: string | null;
+    updatedAt: string | null;
+}
+
+export interface ProductBreadcrumbItem extends ProductCategorySummary {}
+
+export interface ProductProviderSummary {
+    id: string;
+    name: string;
+    logoUrl: string | null;
+    rating: number | null;
+    isActive: boolean;
+    totalProducts: number | null;
+    productsInStock: number | null;
+    averagePrice: number | null;
+    createdAt: string | null;
+}
+
 export interface ShopProduct extends BaseEntity {
     name: string;
     description: string;
@@ -72,6 +102,20 @@ export interface ShopProduct extends BaseEntity {
     is360Enabled: boolean;
     primaryImageUrl?: string;
     priceRange?: string;
+    category?: ProductCategorySummary | null;
+    categoryBreadcrumb?: ProductBreadcrumbItem[];
+    provider?: ProductProviderSummary | null;
+    variants?: ProductVariant[];
+    images?: VariantImage[] | VariantImageGroup | null;
+    availableSizes?: string[];
+    availableColors?: string[];
+}
+
+export interface ShopProductDetail extends ShopProduct {
+    variants: ProductVariant[];
+    images: VariantImage[] | VariantImageGroup | null;
+    availableSizes: string[];
+    availableColors: string[];
 }
 
 // ============================================================================
@@ -150,10 +194,12 @@ export interface CreateVariantRequest {
 
 export interface CreateImageRequest {
     imageUrl: string;
-    imageType: 'regular' | '360' | 'thumbnail';
+    imageType: 'regular' | 'rotation360' | '360' | 'thumbnail';
     sequenceOrder: number;
     isPrimary: boolean;
     associatedColor?: string;
+    variantId?: string;
+    rotationFrameNumber?: number;
 }
 
 // ============================================================================

@@ -11,7 +11,7 @@ import {
     ProductImage,
     GroupedImages
 } from '../../infrastructure/services/product-image.service';
-import { ShopProduct, ProductVariant } from '../../core/entities/ecommerce';
+import { ShopProductDetail, ProductVariant } from '../../core/entities/ecommerce';
 
 // =============================================================================
 // PRODUCT IMAGES HOOK
@@ -55,7 +55,7 @@ export function useProductImages(productId: string) {
  */
 export function useProductDetails(productId: string) {
     // Fetch product
-    const productQuery = useQuery<ShopProduct, Error>({
+    const productQuery = useQuery<ShopProductDetail, Error>({
         queryKey: ['product', productId],
         queryFn: async () => {
             const response = await shopProductService.getProductById(productId);
