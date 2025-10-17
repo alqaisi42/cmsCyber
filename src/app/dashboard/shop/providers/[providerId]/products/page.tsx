@@ -18,7 +18,12 @@ import {
     AlertCircle,
     Palette
 } from 'lucide-react';
-import type { ShopProduct, ProductVariant } from '../../../../../../core/entities/ecommerce';
+import type {
+    ShopProduct,
+    ProductVariant,
+    VariantImage,
+    VariantImageGroup,
+} from '../../../../../../core/entities/ecommerce';
 import type { ProductImage } from '../../../../../../infrastructure/services/product-image.service';
 import { useProviderProducts, useProviderById, useProductVariants } from '../../../../../../presentation/hooks/useShop';
 import { Modal } from '../../../../../../presentation/components/ui/Modal';
@@ -517,9 +522,10 @@ function ProductVariantsModal({ product, isOpen, onClose }: ProductVariantsModal
 }
 
 function VariantPanel({ variant }: { variant: ProductVariant }) {
-    const images = mapVariantImages(variant);
-    const hasImages = images.length > 0;
-    const hasMultipleImages = images.length > 1;
+    const { allImages, rotationImages, total, has360 } = mapVariantImages(variant);
+    const shouldShow360 = rotationImages.length > 1 || (has360 && rotationImages.length > 0);
+    const fallbackImages = rotationImages.length > 0 ? rotationImages : allImages;
+    const hasImages = fallbackImages.length > 0;
     const stockStatus = resolveStockStatus(variant.stockQuantity);
     const computedPrice = typeof (variant as any).price === 'number'
         ? (variant as any).price
@@ -529,12 +535,12 @@ function VariantPanel({ variant }: { variant: ProductVariant }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-6 lg:flex-row">
                 <div className="lg:w-1/2">
-                    {hasMultipleImages ? (
-                        <Image360Viewer images={images} autoPlay={false} className="max-h-[22rem]" />
+                    {shouldShow360 && rotationImages.length > 0 ? (
+                        <Image360Viewer images={rotationImages} autoPlay={false} className="max-h-[22rem]" />
                     ) : hasImages ? (
                         <div className="overflow-hidden rounded-lg bg-slate-100">
                             <img
-                                src={images[0].imageUrl}
+                                src={fallbackImages[0].imageUrl}
                                 alt={`${variant.sku} preview`}
                                 className="w-full object-contain"
                             />
@@ -605,9 +611,9 @@ function VariantPanel({ variant }: { variant: ProductVariant }) {
                         )}
                     </div>
 
-                    {variant.images?.length ? (
+                    {total > 0 ? (
                         <p className="text-xs text-slate-500">
-                            Showing {hasMultipleImages ? '360° rotation' : 'primary'} media ({variant.images.length} image{variant.images.length > 1 ? 's' : ''}).
+                            Showing {shouldShow360 ? '360° rotation' : 'primary'} media ({total} image{total !== 1 ? 's' : ''}).
                         </p>
                     ) : null}
                 </div>
@@ -616,31 +622,91 @@ function VariantPanel({ variant }: { variant: ProductVariant }) {
     );
 }
 
-function mapVariantImages(variant: ProductVariant): ProductImage[] {
-    if (!variant.images || variant.images.length === 0) {
-        return [];
+function mapVariantImages(
+    variant: ProductVariant
+): { allImages: ProductImage[]; rotationImages: ProductImage[]; total: number; has360: boolean } {
+    const rawImages = variant.images;
+
+    if (!rawImages) {
+        return { allImages: [], rotationImages: [], total: 0, has360: false };
     }
 
-    return variant.images
-        .map((image, index) => {
-            const createdAt = image.createdAt
-                ? new Date(image.createdAt).toISOString()
-                : null;
+    const collected: Array<{ image: ProductImage; index: number }> = [];
 
-            return {
-                id: image.id,
-                productId: variant.productId,
+    const pushImage = (image: VariantImage | null | undefined, index: number) => {
+        if (!image || !image.imageUrl) {
+            return;
+        }
+
+        const rotationFrameNumber =
+            typeof image.rotationFrameNumber === 'number' ? image.rotationFrameNumber : null;
+
+        const sequenceOrderCandidate =
+            typeof rotationFrameNumber === 'number'
+                ? rotationFrameNumber
+                : typeof image.sequenceOrder === 'number'
+                ? image.sequenceOrder
+                : index;
+
+        const sequenceOrder = Number.isFinite(sequenceOrderCandidate)
+            ? (sequenceOrderCandidate as number)
+            : index;
+
+        const normalizedType = image.imageType === 'rotation360' ? '360' : image.imageType ?? 'regular';
+
+        collected.push({
+            image: {
+                id: image.id ?? `${variant.id}-${index}`,
+                productId: image.productId ?? variant.productId,
                 imageUrl: image.imageUrl,
-                imageType: image.imageType,
-                sequenceOrder: typeof image.sequenceOrder === 'number' ? image.sequenceOrder : index,
-                isPrimary: image.isPrimary ?? false,
-                associatedColor: image.associatedColor ?? null,
-                variantId: variant.id,
+                imageType: normalizedType,
+                sequenceOrder,
+                isPrimary: Boolean(image.isPrimary),
+                associatedColor:
+                    image.associatedColor !== undefined && image.associatedColor !== null
+                        ? image.associatedColor
+                        : null,
+                variantId: image.variantId ?? variant.id,
                 altText: null,
                 dimensions: null,
                 fileSize: null,
-                createdAt,
-            } satisfies ProductImage;
+                createdAt: image.createdAt ?? null,
+                rotationFrameNumber,
+            },
+            index,
+        });
+    };
+
+    if (Array.isArray(rawImages)) {
+        rawImages.forEach((image, index) => pushImage(image, index));
+    } else {
+        const grouped = rawImages as VariantImageGroup;
+        let nextIndex = collected.length;
+
+        if (grouped.primaryImage) {
+            pushImage(grouped.primaryImage, nextIndex++);
+        }
+
+        grouped.galleryImages?.forEach((image) => pushImage(image, nextIndex++));
+        grouped.rotation360Images?.forEach((image) => pushImage(image, nextIndex++));
+    }
+
+    const allImages = collected
+        .sort((a, b) => {
+            if (a.image.sequenceOrder === b.image.sequenceOrder) {
+                return a.index - b.index;
+            }
+            return a.image.sequenceOrder - b.image.sequenceOrder;
         })
-        .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+        .map(({ image }) => image);
+
+    const rotationImages = allImages.filter((image) => image.imageType === '360' || image.imageType === 'rotation360');
+    const total = Array.isArray(rawImages)
+        ? allImages.length
+        : typeof (rawImages as VariantImageGroup).totalImages === 'number'
+        ? (rawImages as VariantImageGroup).totalImages
+        : allImages.length;
+    const has360 = rotationImages.length > 0 || (!Array.isArray(rawImages) && Boolean((rawImages as VariantImageGroup).has360View));
+
+    return { allImages, rotationImages, total, has360 };
 }

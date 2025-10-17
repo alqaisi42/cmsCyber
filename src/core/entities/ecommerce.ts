@@ -91,16 +91,31 @@ export interface ProductVariant extends BaseEntity {
     barcode?: string;
     weight?: number;
     inStockNo?: string;
-    images: VariantImage[];
+    images?: VariantImage[] | VariantImageGroup | null;
 }
 
-export interface VariantImage extends BaseEntity {
-    variantId: string;
+export interface VariantImage {
+    id?: string;
+    productId?: string;
+    variantId?: string;
     imageUrl: string;
-    imageType: 'regular' | '360' | 'thumbnail';
-    sequenceOrder: number;
-    isPrimary: boolean;
-    associatedColor?: string;
+    imageType: 'regular' | 'rotation360' | '360' | 'thumbnail';
+    sequenceOrder?: number;
+    isPrimary?: boolean;
+    associatedColor?: string | null;
+    rotationFrameNumber?: number | null;
+    createdAt?: string | null;
+}
+
+export interface VariantImageGroup {
+    variantId: string;
+    color?: string | null;
+    size?: string | null;
+    primaryImage: VariantImage | null;
+    galleryImages?: VariantImage[];
+    rotation360Images?: VariantImage[];
+    totalImages?: number;
+    has360View?: boolean;
 }
 
 // ============================================================================

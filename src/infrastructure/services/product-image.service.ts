@@ -21,7 +21,7 @@ export interface ProductImage {
     id: string;
     productId: string;
     imageUrl: string;
-    imageType: 'regular' | '360' | 'thumbnail';
+    imageType: 'regular' | 'rotation360' | '360' | 'thumbnail';
     sequenceOrder: number;
     isPrimary: boolean;
     associatedColor: string | null;
@@ -30,6 +30,7 @@ export interface ProductImage {
     dimensions: string | null;
     fileSize: number | null;
     createdAt: string | null;
+    rotationFrameNumber?: number | null;
 }
 
 export interface GroupedImages {
