@@ -13,17 +13,16 @@ import {
     Tag,
     TrendingUp,
 } from 'lucide-react';
-import {useProductDetails} from "../../../../../../presentation/hooks/useProductDetails";
+import { useProductDetails } from '../../../../../presentation/hooks/useProductDetails';
+import { ProductVariant } from '../../../../../core/entities/ecommerce';
 import {
-    canPurchaseVariant,
-    findVariantByAttributes,
-    getStockStatus,
     getUniqueColors,
-    getUniqueSizes
-} from "../../../../../../shared/utils/variant.utils";
-import {safeToFixed} from "../../../../../../shared/utils/number.utils";
-import {formatCurrency} from "../../../../../../shared/utils/cn";
-
+    getUniqueSizes,
+    findVariantByAttributes,
+    canPurchaseVariant,
+    getStockStatus,
+} from '../../../../../shared/utils/variant.utils';
+import { safeToFixed, formatCurrency } from '../../../../../shared/utils/number.utils';
 
 export default function ProductDetailsPage() {
     const params = useParams();
@@ -58,19 +57,31 @@ export default function ProductDetailsPage() {
         );
     }
 
-    // Error state
+    // Error state with detailed debugging
     if (error || !product) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
+                <div className="text-center max-w-2xl">
                     <p className="text-red-600 font-bold text-xl mb-2">Error loading product</p>
-                    <p className="text-sm text-slate-600 mb-4">{String(error)}</p>
-                    <button
-                        onClick={() => router.back()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                        Go Back
-                    </button>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <p className="text-sm text-slate-600 mb-2"><strong>Product ID:</strong> {productId}</p>
+                        <p className="text-sm text-slate-600 mb-2"><strong>Error:</strong> {error ? String(error) : 'No error, but product is null'}</p>
+                        <p className="text-sm text-slate-600"><strong>API Endpoint:</strong> /api/v1/products/{productId}</p>
+                    </div>
+                    <div className="flex gap-2 justify-center">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        >
+                            Retry
+                        </button>
+                        <button
+                            onClick={() => router.back()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            Go Back
+                        </button>
+                    </div>
                 </div>
             </div>
         );

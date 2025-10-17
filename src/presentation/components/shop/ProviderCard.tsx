@@ -9,6 +9,12 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, onViewProducts }: ProviderCardProps) {
+    // ✅ FIX: Safe handling of potentially null/undefined values
+    const rating = provider.rating ?? 0;
+    const averagePrice = provider.averagePrice ?? 0;
+    const totalProducts = provider.totalProducts ?? 0;
+    const productsInStock = provider.productsInStock ?? 0;
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between mb-4">
@@ -28,15 +34,20 @@ export function ProviderCard({ provider, onViewProducts }: ProviderCardProps) {
                         <h3 className="text-lg font-semibold text-slate-900">{provider.name}</h3>
                         <div className="flex items-center gap-1 mt-1">
                             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-medium text-slate-700">{provider.rating.toFixed(1)}</span>
+                            {/* ✅ FIX: Safe toFixed() call */}
+                            <span className="text-sm font-medium text-slate-700">
+                {rating.toFixed(1)}
+              </span>
                         </div>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    provider.isActive
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                }`}>
+                <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        provider.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                    }`}
+                >
           {provider.isActive ? 'Active' : 'Inactive'}
         </span>
             </div>
@@ -46,21 +57,24 @@ export function ProviderCard({ provider, onViewProducts }: ProviderCardProps) {
                     <div className="flex items-center justify-center gap-1 text-slate-600 mb-1">
                         <Package className="w-4 h-4" />
                     </div>
-                    <p className="text-2xl font-bold text-slate-900">{provider.totalProducts}</p>
+                    <p className="text-2xl font-bold text-slate-900">{totalProducts}</p>
                     <p className="text-xs text-slate-600">Products</p>
                 </div>
                 <div className="text-center border-x border-slate-200">
                     <div className="flex items-center justify-center gap-1 text-slate-600 mb-1">
                         <TrendingUp className="w-4 h-4" />
                     </div>
-                    <p className="text-2xl font-bold text-green-600">{provider.productsInStock}</p>
+                    <p className="text-2xl font-bold text-green-600">{productsInStock}</p>
                     <p className="text-xs text-slate-600">In Stock</p>
                 </div>
                 <div className="text-center">
                     <div className="flex items-center justify-center gap-1 text-slate-600 mb-1">
                         <DollarSign className="w-4 h-4" />
                     </div>
-                    <p className="text-2xl font-bold text-slate-900">${provider.averagePrice.toFixed(0)}</p>
+                    {/* ✅ FIX: Safe toFixed() call */}
+                    <p className="text-2xl font-bold text-slate-900">
+                        ${averagePrice.toFixed(0)}
+                    </p>
                     <p className="text-xs text-slate-600">Avg Price</p>
                 </div>
             </div>

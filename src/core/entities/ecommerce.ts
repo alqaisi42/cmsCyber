@@ -1,76 +1,81 @@
-// src/core/entities/ecommerce.ts
-// NEW E-commerce entities - separate from existing healthcare entities
+// =============================================================================
+// E-commerce Domain Entities - WITH PROPER NULL HANDLING
+// File: src/core/entities/ecommerce.ts
+// =============================================================================
 
 
 // ============================================================================
-// PROVIDER ENTITIES (Enhanced from basic version)
+// SHOP PROVIDER
 // ============================================================================
 
 import {BaseEntity} from "./index";
 
 export interface ShopProvider extends BaseEntity {
     name: string;
-    logoUrl?: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    country: string;
-    rating: number;
-    isActive: boolean;
-    totalProducts: number;
-    productsInStock: number;
-    averagePrice: number;
     description?: string;
+    contactEmail: string;
+    contactPhone?: string;
+    address?: string;
+    logoUrl?: string;
+    website?: string;
+    isActive: boolean;
+    rating: number;
+}
+
+export interface ProviderStatsResponse {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+    rating: number | null; // ✅ Explicitly nullable
+    isActive: boolean;
+    totalProducts: number | null; // ✅ Explicitly nullable
+    productsInStock: number | null; // ✅ Explicitly nullable
+    averagePrice: number | null; // ✅ Explicitly nullable
+    createdAt: string;
 }
 
 // ============================================================================
-// CATEGORY ENTITIES (COMPLETELY NEW)
+// CATEGORY
 // ============================================================================
 
 export interface Category extends BaseEntity {
     name: string;
     description?: string;
-    parentId?: string;
+    slug: string;
     imageUrl?: string;
-    iconName?: string;
-    sortOrder: number;
     isActive: boolean;
-    productCount: number;
+    displayOrder: number;
+    parentCategoryId?: string;
+    subcategories?: Category[];
 }
 
 // ============================================================================
-// PRODUCT ENTITIES (Enhanced)
+// PRODUCT
 // ============================================================================
 
 export interface ShopProduct extends BaseEntity {
     name: string;
     description: string;
-    basePrice: number;
-    priceRange?: string; // "$89.99 - $129.99"
+    basePrice: number | null; // ✅ Explicitly nullable
     categoryId: string;
-    category?: Category;
+    categoryName?: string;
     providerId: string;
-    provider?: ShopProvider;
+    providerName?: string;
     brandName?: string;
-    primaryImageUrl?: string;
+    sku: string;
+    rating: number | null; // ✅ Explicitly nullable
+    totalReviews: number;
+    totalStock: number | null; // ✅ Explicitly nullable
+    isActive: boolean;
     isOnSale: boolean;
-    discountPercentage: number;
-    rating: number;
-    totalStock: number;
+    discountPercentage: number | null; // ✅ Explicitly nullable
     is360Enabled: boolean;
-    status: ProductStatus;
-}
-
-export enum ProductStatus {
-    ACTIVE = 'ACTIVE',
-    INACTIVE = 'INACTIVE',
-    OUT_OF_STOCK = 'OUT_OF_STOCK',
-    DRAFT = 'DRAFT'
+    primaryImageUrl?: string;
+    priceRange?: string;
 }
 
 // ============================================================================
-// PRODUCT VARIANT ENTITIES (COMPLETELY NEW)
+// PRODUCT VARIANT
 // ============================================================================
 
 export interface ProductVariant extends BaseEntity {
@@ -80,7 +85,6 @@ export interface ProductVariant extends BaseEntity {
     sku: string;
     basePrice: number;
     priceAdjustment: number;
-    finalPrice: number; // basePrice + priceAdjustment
     stockQuantity: number;
     lowStockThreshold: number;
     isAvailable: boolean;
@@ -151,16 +155,4 @@ export interface ProductSearchParams {
     sortBy?: 'newest' | 'priceAsc' | 'priceDesc' | 'rating';
     page: number;
     size: number;
-}
-
-export interface ProviderStatsResponse {
-    id: string;
-    name: string;
-    logoUrl?: string;
-    rating: number;
-    isActive: boolean;
-    totalProducts: number;
-    productsInStock: number;
-    averagePrice: number;
-    createdAt: string;
 }
