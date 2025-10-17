@@ -9,6 +9,7 @@ import {
     DashboardStats
 } from '../entities';
 
+
 export interface PaginationParams {
     page: number;
     limit: number;
@@ -23,6 +24,13 @@ export interface PaginatedResponse<T> {
     page: number;
     limit: number;
     totalPages: number;
+}
+
+// Base entity interface (if not already in entities/base.ts)
+export interface BaseEntity {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 // Authentication Repository

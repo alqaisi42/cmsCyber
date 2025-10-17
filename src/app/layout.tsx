@@ -1,12 +1,16 @@
+// src/app/layout.tsx
+// Root layout with React Query provider
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { QueryProvider } from '../presentation/providers/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
     title: '3lababee Admin Portal',
-    description: 'Administrative portal for managing users, providers, products, and lockers',
+    description: 'Admin dashboard for 3lababee',
 };
 
 export default function RootLayout({
@@ -17,7 +21,9 @@ export default function RootLayout({
     return (
         <html lang="en">
         <body className={inter.className}>
-        {children}
+        <QueryProvider>
+            {children}
+        </QueryProvider>
         </body>
         </html>
     );

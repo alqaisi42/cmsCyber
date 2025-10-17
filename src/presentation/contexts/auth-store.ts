@@ -1,107 +1,91 @@
+// src/presentation/contexts/auth-store.ts
+// SIMPLIFIED VERSION - No complex middleware, just works
+
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { User } from '../../core/entities';
-import { isAuthenticated, getCurrentUser } from '../../shared/utils/auth'; // Import auth utils
+
+interface User {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+}
 
 interface AuthState {
     user: User | null;
     token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-}
 
-interface AuthActions {
     setAuth: (user: User, token: string) => void;
     clearAuth: () => void;
-    setLoading: (loading: boolean) => void;
-    updateUser: (userData: Partial<User>) => void;
     initialize: () => void;
 }
 
-type AuthStore = AuthState & AuthActions;
+// Create store WITHOUT persist middleware first
+export const useAuthStore = create<AuthState>((set, get) => ({
+    // Initial state
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: true,
 
-export const useAuthStore = create<AuthStore>()(
-    persist(
-        (set, get) => ({
-            // Initial state
+    // Set authentication
+    setAuth: (user, token) => {
+        // Save to localStorage manually
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('auth-user', JSON.stringify(user));
+            localStorage.setItem('auth-token', token);
+        }
+
+        set({
+            user,
+            token,
+            isAuthenticated: true,
+            isLoading: false
+        });
+    },
+
+    // Clear authentication
+    clearAuth: () => {
+        // Remove from localStorage
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth-user');
+            localStorage.removeItem('auth-token');
+        }
+
+        set({
             user: null,
             token: null,
             isAuthenticated: false,
-            isLoading: true,
+            isLoading: false
+        });
+    },
 
-            // Actions
-            setAuth: (user, token) => {
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('auth_token', token);
-                }
+    // Initialize from localStorage
+    initialize: () => {
+        if (typeof window === 'undefined') {
+            set({ isLoading: false });
+            return;
+        }
+
+        try {
+            const userStr = localStorage.getItem('auth-user');
+            const token = localStorage.getItem('auth-token');
+
+            if (userStr && token) {
+                const user = JSON.parse(userStr);
                 set({
                     user,
                     token,
                     isAuthenticated: true,
-                    isLoading: false,
+                    isLoading: false
                 });
-            },
-
-            clearAuth: () => {
-                if (typeof window !== 'undefined') {
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user'); // Align with auth.ts
-                    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                }
-                set({
-                    user: null,
-                    token: null,
-                    isAuthenticated: false,
-                    isLoading: false,
-                });
-            },
-
-            setLoading: (loading) => set({ isLoading: loading }),
-
-            updateUser: (userData) =>
-                set((state) => ({
-                    user: state.user ? { ...state.user, ...userData } : null,
-                })),
-
-            initialize: () => {
-                if (typeof window === 'undefined') {
-                    set({ isLoading: false });
-                    return;
-                }
-
-                // Check both persisted state and localStorage
-                const state = get();
-                const token = state.token || localStorage.getItem('auth_token');
-                const user = state.user || getCurrentUser();
-
-                if (token && user) {
-                    set({
-                        token,
-                        user,
-                        isAuthenticated: true,
-                        isLoading: false,
-                    });
-                } else {
-                    set({
-                        token: null,
-                        user: null,
-                        isAuthenticated: false,
-                        isLoading: false,
-                    });
-                }
-            },
-        }),
-        {
-            name: 'auth-storage',
-            storage: createJSONStorage(() => localStorage),
-            partialize: (state) => ({
-                user: state.user,
-                token: state.token,
-                isAuthenticated: state.isAuthenticated,
-            }),
-            onRehydrateStorage: () => (state) => {
-                state?.initialize();
-            },
+            } else {
+                set({ isLoading: false });
+            }
+        } catch (error) {
+            console.error('Failed to initialize auth:', error);
+            set({ isLoading: false });
         }
-    )
-);
+    }
+}));

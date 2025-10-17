@@ -1,4 +1,6 @@
 // src/presentation/components/Sidebar.tsx
+// MINIMAL VERSION - No auth store usage
+
 'use client';
 
 import Link from 'next/link';
@@ -13,10 +15,10 @@ import {
     Settings,
     LogOut,
     Menu,
-    X
+    X,
+    Tag
 } from 'lucide-react';
 import { useState } from 'react';
-import { useAuthStore } from "../contexts/auth-store";
 import { cn } from "../../shared/utils/cn";
 
 const navigationItems = [
@@ -35,6 +37,23 @@ const navigationItems = [
         href: '/dashboard/users',
         icon: Users,
     },
+    // Shop Management Section
+    {
+        title: 'Shop Providers',
+        href: '/dashboard/shop/providers',
+        icon: Store,
+    },
+    {
+        title: 'Shop Products',
+        href: '/dashboard/shop/products',
+        icon: Package,
+    },
+    {
+        title: 'Categories',
+        href: '/dashboard/shop/categories',
+        icon: Tag,
+    },
+    // Other sections
     {
         title: 'Providers',
         href: '/dashboard/providers',
@@ -60,11 +79,12 @@ const navigationItems = [
 export function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
-    const { user, clearAuth } = useAuthStore();
 
     const handleLogout = () => {
-        clearAuth();
-        window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
     };
 
     return (
@@ -80,7 +100,7 @@ export function Sidebar() {
             {/* Sidebar */}
             <aside
                 className={cn(
-                    'fixed left-0 top-0 h-screen bg-gray-900 text-white transition-all duration-300 z-40',
+                    'fixed left-0 top-0 h-screen bg-gray-900 text-white transition-all duration-300 z-40 overflow-y-auto',
                     collapsed ? 'w-0 lg:w-20' : 'w-64'
                 )}
             >
@@ -93,50 +113,60 @@ export function Sidebar() {
                         )}>
                             {collapsed ? '3L' : '3lababee'}
                         </h1>
-                        {!collapsed && (
-                            <p className="text-xs text-gray-400 mt-1">Admin Portal</p>
-                        )}
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                        {navigationItems.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                    <nav className="flex-1 p-4">
+                        <ul className="space-y-2">
+                            {navigationItems.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
 
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={cn(
-                                        'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                                        isActive
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-300 hover:bg-gray-800 hover:text-white',
-                                        collapsed && 'lg:justify-center'
-                                    )}
-                                >
-                                    <Icon className="w-5 h-5 flex-shrink-0" />
-                                    {!collapsed && (
-                                        <span className="font-medium">{item.title}</span>
-                                    )}
-                                </Link>
-                            );
-                        })}
+                                return (
+                                    <li key={item.href}>
+                                        <Link
+                                            href={item.href}
+                                            className={cn(
+                                                'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                                                isActive
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+                                                collapsed && 'lg:justify-center'
+                                            )}
+                                        >
+                                            <Icon className="w-5 h-5 flex-shrink-0" />
+                                            {!collapsed && (
+                                                <span className="font-medium">{item.title}</span>
+                                            )}
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     </nav>
 
-                    {/* User info & logout */}
+                    {/* User Section */}
                     <div className="p-4 border-t border-gray-800">
-                        {!collapsed && user && (
-                            <div className="mb-3 px-4">
-                                <p className="text-sm font-medium">{user.name}</p>
-                                <p className="text-xs text-gray-400">{user.email}</p>
+                        <div className={cn(
+                            'flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-800',
+                            collapsed && 'lg:justify-center'
+                        )}>
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-semibold">A</span>
                             </div>
-                        )}
+                            {!collapsed && (
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-white truncate">Admin User</p>
+                                    <p className="text-xs text-gray-400 truncate">admin@3lababee.com</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Logout Button */}
                         <button
                             onClick={handleLogout}
                             className={cn(
-                                'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-600 hover:text-white transition-colors',
+                                'w-full mt-2 flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors',
                                 collapsed && 'lg:justify-center'
                             )}
                         >
@@ -146,14 +176,6 @@ export function Sidebar() {
                     </div>
                 </div>
             </aside>
-
-            {/* Overlay for mobile */}
-            {!collapsed && (
-                <div
-                    className="lg:hidden fixed inset-0 bg-black/50 z-30"
-                    onClick={() => setCollapsed(true)}
-                />
-            )}
         </>
     );
 }

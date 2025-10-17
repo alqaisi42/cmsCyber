@@ -12,6 +12,7 @@ import {
     TPADashboardStats,
     ClaimStatus
 } from '../../entities/healthcare';
+import {PaginatedResponse, PaginationParams} from "../repositories";
 
 
 // ============================================================================
@@ -234,22 +235,3 @@ export interface ITPADashboardRepository {
     }>>;
 }
 
-// ============================================================================
-// BASE REPOSITORY TYPES
-// ============================================================================
-
-export interface PaginationParams {
-    page: number;
-    limit: number;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-}
-
-export interface PaginatedResponse<T> {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
