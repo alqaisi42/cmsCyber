@@ -1,5 +1,7 @@
-// src/infrastructure/services/shop-admin.service.ts
-// COMPLETE FIX - Handles API response structure correctly
+// =============================================================================
+// File: src/infrastructure/services/shop-admin.service.ts
+// FINAL FIX - Type safe with correct PaginatedResponse interface
+// =============================================================================
 
 import {
     ShopProvider,
@@ -11,41 +13,67 @@ import {
     ProductSearchParams,
     ProviderStatsResponse
 } from '../../core/entities/ecommerce';
-import { PaginatedResponse } from "../../core/interfaces/repositories";
+import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 
 // ============================================================================
-// API RESPONSE TYPES
+// SPRING BOOT RESPONSE TYPES
 // ============================================================================
 
+/**
+ * Spring Boot pagination response structure from backend
+ */
 interface SpringBootPageResponse<T> {
     content: T[];
     pageable: {
         pageNumber: number;
         pageSize: number;
+        sort: {
+            empty: boolean;
+            sorted: boolean;
+            unsorted: boolean;
+        };
+        offset: number;
+        paged: boolean;
+        unpaged: boolean;
     };
+    last: boolean;
     totalPages: number;
     totalElements: number;
-}
-
-interface ApiResponse<T> {
-    success: boolean;
-    data: T;
-    message?: string;
-    errors?: string[];
-    timestamp?: string;
+    size: number;
+    number: number;
+    sort: {
+        empty: boolean;
+        sorted: boolean;
+        unsorted: boolean;
+    };
+    first: boolean;
+    numberOfElements: number;
+    empty: boolean;
 }
 
 // ============================================================================
-// TRANSFORM FUNCTION
+// RESPONSE TRANSFORMATION
 // ============================================================================
 
+/**
+ * Transform Spring Boot page response to our PaginatedResponse format
+ *
+ * Our PaginatedResponse interface (from src/core/interfaces/repositories.ts):
+ * {
+ *   data: T[];
+ *   total: number;
+ *   page: number;
+ *   limit: number;
+ *   totalPages: number;
+ * }
+ */
 function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<T>): PaginatedResponse<T> {
     return {
-        data: springResponse.content || [],
-        total: springResponse.totalElements || 0,
-        page: springResponse.pageable?.pageNumber || 0,
-        limit: springResponse.pageable?.pageSize || 20,
-        totalPages: springResponse.totalPages || 0
+        data: springResponse.content,           // ✅ data = content
+        total: springResponse.totalElements,    // ✅ total = totalElements
+        page: springResponse.number,            // ✅ page = number
+        limit: springResponse.size,             // ✅ limit = size
+        totalPages: springResponse.totalPages,  // ✅ totalPages = totalPages
     };
 }
 
@@ -56,15 +84,20 @@ function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<
 class ShopProviderService {
     private readonly baseUrl = '/api/v1/providers';
 
+    /**
+     * Get all providers with statistics
+     */
     async getProviders(): Promise<ApiResponse<ProviderStatsResponse[]>> {
         const response = await fetch(this.baseUrl, {
-            headers: { 'Accept': 'application/json' },
             cache: 'no-store'
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
+    /**
+     * Get provider by ID
+     */
     async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             cache: 'no-store'
@@ -74,42 +107,23 @@ class ShopProviderService {
     }
 
     /**
-     * ✅ FIXED: Properly handles nested response structure
-     * Backend returns: { success: true, data: { content: [...], totalElements: 156 } }
-     * We transform to: { data: [...], total: 156, totalPages: 8, page: 0, limit: 20 }
+     * Get products for a specific provider with pagination
+     * Returns transformed PaginatedResponse
      */
-    async getProviderProducts(
-        providerId: string,
-        page: number = 0,
-        size: number = 20
-    ): Promise<PaginatedResponse<ShopProduct>> {
-        const url = `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`;
+    async getProviderProducts(providerId: string, page: number = 0, size: number = 20): Promise<PaginatedResponse<ShopProduct>> {
+        const response = await fetch(
+            `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`,
+            { cache: 'no-store' }
+        );
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-        console.log('🔵 Fetching providers products:', url);
-
-        const response = await fetch(url, {
-            cache: 'no-store',
-            headers: { 'Accept': 'application/json' }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Get the wrapped response
         const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
-
-        console.log('🔵 Raw API Response:', apiResponse);
-        console.log('🔵 Nested data:', apiResponse.data);
-
-        // Transform the nested Spring Boot response to our format
-        const transformed = transformToPaginatedResponse(apiResponse.data);
-
-        console.log('✅ Transformed Response:', transformed);
-
-        return transformed;
+        return transformToPaginatedResponse(apiResponse.data);
     }
 
+    /**
+     * Create a new provider
+     */
     async createProvider(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
@@ -120,6 +134,9 @@ class ShopProviderService {
         return response.json();
     }
 
+    /**
+     * Update provider
+     */
     async updateProvider(id: string, provider: Partial<ShopProvider>): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             method: 'PATCH',
@@ -130,6 +147,9 @@ class ShopProviderService {
         return response.json();
     }
 
+    /**
+     * Toggle provider active status
+     */
     async toggleProviderStatus(id: string, isActive: boolean): Promise<ApiResponse<ShopProvider>> {
         return this.updateProvider(id, { isActive });
     }
@@ -142,6 +162,31 @@ class ShopProviderService {
 class ShopProductService {
     private readonly baseUrl = '/api/v1/products';
 
+    /**
+     * Get all products with pagination
+     * ✅ This was MISSING and causing the error!
+     */
+    async getProducts(page: number = 0, size: number = 20): Promise<PaginatedResponse<ShopProduct>> {
+        const queryParams = new URLSearchParams({
+            page: page.toString(),
+            size: size.toString()
+        });
+
+        const response = await fetch(`${this.baseUrl}?${queryParams.toString()}`, {
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
+        return transformToPaginatedResponse(apiResponse.data);
+    }
+
+    /**
+     * Create a new product
+     */
     async createProduct(request: CreateProductRequest): Promise<ApiResponse<{ id: string }>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
@@ -152,6 +197,9 @@ class ShopProductService {
         return response.json();
     }
 
+    /**
+     * Get product by ID
+     */
     async getProductById(id: string): Promise<ApiResponse<ShopProduct>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             cache: 'no-store'
@@ -160,6 +208,9 @@ class ShopProductService {
         return response.json();
     }
 
+    /**
+     * Update product
+     */
     async updateProduct(id: string, product: Partial<ShopProduct>): Promise<ApiResponse<ShopProduct>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             method: 'PATCH',
@@ -170,6 +221,9 @@ class ShopProductService {
         return response.json();
     }
 
+    /**
+     * Delete product
+     */
     async deleteProduct(id: string): Promise<ApiResponse<void>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             method: 'DELETE'
@@ -179,7 +233,7 @@ class ShopProductService {
     }
 
     /**
-     * ✅ FIXED: Search products with proper transformation
+     * Search products with filters and pagination
      */
     async searchProducts(params: ProductSearchParams): Promise<PaginatedResponse<ShopProduct>> {
         const queryParams = new URLSearchParams();
@@ -310,7 +364,7 @@ class CategoryService {
 }
 
 // ============================================================================
-// EXPORT SINGLETONS
+// EXPORT SERVICE INSTANCES
 // ============================================================================
 
 export const shopProviderService = new ShopProviderService();

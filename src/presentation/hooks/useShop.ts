@@ -1,6 +1,6 @@
 // =============================================================================
-// src/presentation/hooks/useShop.ts
-// COMPLETE FILE - All React Query Hooks for Shop System
+// File: src/presentation/hooks/useShop.ts
+// UPDATED - Added missing hooks for variants
 // =============================================================================
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,9 +26,6 @@ import { PaginatedResponse } from '../../core/interfaces/repositories';
 // PROVIDER HOOKS
 // =============================================================================
 
-/**
- * Fetch all providers with statistics
- */
 export function useProviders() {
     return useQuery<ProviderStatsResponse[], Error>({
         queryKey: ['providers'],
@@ -36,13 +33,10 @@ export function useProviders() {
             const response = await shopProviderService.getProviders();
             return response.data;
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 }
 
-/**
- * Fetch a single providers by ID
- */
 export function useProviderById(providerId: string) {
     return useQuery<ShopProvider, Error>({
         queryKey: ['provider', providerId],
@@ -55,9 +49,6 @@ export function useProviderById(providerId: string) {
     });
 }
 
-/**
- * Fetch products for a specific providers with pagination
- */
 export function useProviderProducts(
     providerId: string,
     page: number = 0,
@@ -73,9 +64,7 @@ export function useProviderProducts(
     });
 }
 
-/**
- * Create a new providers
- */
+
 export function useCreateProvider() {
     const queryClient = useQueryClient();
 
@@ -90,9 +79,6 @@ export function useCreateProvider() {
     });
 }
 
-/**
- * Update an existing providers
- */
 export function useUpdateProvider() {
     const queryClient = useQueryClient();
 
@@ -108,9 +94,6 @@ export function useUpdateProvider() {
     });
 }
 
-/**
- * Toggle providers active status
- */
 export function useToggleProviderStatus() {
     const queryClient = useQueryClient();
 
@@ -130,55 +113,53 @@ export function useToggleProviderStatus() {
 // PRODUCT HOOKS
 // =============================================================================
 
-/**
- * Fetch a single product by ID
- */
 export function useProductById(productId: string) {
-    return useQuery<ShopProduct, Error>({
+    return useQuery({
         queryKey: ['product', productId],
         queryFn: async () => {
             const response = await shopProductService.getProductById(productId);
-            return response.data;
+            return response;
         },
         enabled: !!productId,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 2 * 60 * 1000,
     });
 }
 
-/**
- * Search products with filters and pagination
- */
+export function useProducts(page: number = 0, size: number = 20) {
+    return useQuery<PaginatedResponse<ShopProduct>, Error>({
+        queryKey: ['products', page, size],
+        queryFn: async () => {
+            return await shopProductService.getProducts(page, size);
+        },
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
 export function useSearchProducts(params: ProductSearchParams) {
     return useQuery<PaginatedResponse<ShopProduct>, Error>({
         queryKey: ['products-search', params],
         queryFn: async () => {
             return await shopProductService.searchProducts(params);
         },
-        staleTime: 2 * 60 * 1000,
+        staleTime: 1 * 60 * 1000,
     });
 }
 
-/**
- * Create a new product with variants
- */
 export function useCreateProduct() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (request: CreateProductRequest) => {
-            const response = await shopProductService.createProduct(request);
+        mutationFn: async (product: CreateProductRequest) => {
+            const response = await shopProductService.createProduct(product);
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products-search'] });
-            queryClient.invalidateQueries({ queryKey: ['providers-products'] });
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['provider-products'] });
         },
     });
 }
 
-/**
- * Update an existing product
- */
 export function useUpdateProduct() {
     const queryClient = useQueryClient();
 
@@ -188,16 +169,12 @@ export function useUpdateProduct() {
             return response.data;
         },
         onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
             queryClient.invalidateQueries({ queryKey: ['product', data.id] });
-            queryClient.invalidateQueries({ queryKey: ['products-search'] });
-            queryClient.invalidateQueries({ queryKey: ['providers-products', data.providerId] });
         },
     });
 }
 
-/**
- * Delete a product
- */
 export function useDeleteProduct() {
     const queryClient = useQueryClient();
 
@@ -206,28 +183,28 @@ export function useDeleteProduct() {
             await shopProductService.deleteProduct(productId);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products-search'] });
-            queryClient.invalidateQueries({ queryKey: ['providers-products'] });
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['provider-products'] });
         },
     });
 }
 
 // =============================================================================
-// VARIANT HOOKS
+// VARIANT HOOKS - NEW
 // =============================================================================
 
 /**
- * Fetch all variants for a product
+ * Fetch all variants for a specific product
  */
 export function useProductVariants(productId: string) {
-    return useQuery<ProductVariant[], Error>({
+    return useQuery({
         queryKey: ['product-variants', productId],
         queryFn: async () => {
             const response = await productVariantService.getProductVariants(productId);
-            return response.data || [];
+            return response;
         },
         enabled: !!productId,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 2 * 60 * 1000,
     });
 }
 
@@ -238,14 +215,8 @@ export function useCreateVariant() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({
-                               productId,
-                               request,
-                           }: {
-            productId: string;
-            request: CreateVariantRequest;
-        }) => {
-            const response = await productVariantService.createVariant(productId, request);
+        mutationFn: async ({ productId, variant }: { productId: string; variant: CreateVariantRequest }) => {
+            const response = await productVariantService.createVariant(productId, variant);
             return response.data;
         },
         onSuccess: (data, variables) => {
@@ -262,8 +233,8 @@ export function useUpdateVariant() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<ProductVariant> }) => {
-            const response = await productVariantService.updateVariant(id, data);
+        mutationFn: async ({ variantId, variant }: { variantId: string; variant: Partial<ProductVariant> }) => {
+            const response = await productVariantService.updateVariant(variantId, variant);
             return response.data;
         },
         onSuccess: (data) => {
@@ -295,9 +266,6 @@ export function useDeleteVariant() {
 // CATEGORY HOOKS
 // =============================================================================
 
-/**
- * Fetch all categories
- */
 export function useCategories() {
     return useQuery<Category[], Error>({
         queryKey: ['categories'],
@@ -309,9 +277,6 @@ export function useCategories() {
     });
 }
 
-/**
- * Fetch a single category by ID
- */
 export function useCategoryById(categoryId: string) {
     return useQuery<Category, Error>({
         queryKey: ['category', categoryId],
@@ -324,16 +289,11 @@ export function useCategoryById(categoryId: string) {
     });
 }
 
-/**
- * Create a new category
- */
 export function useCreateCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (
-            category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>
-        ) => {
+        mutationFn: async (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>) => {
             const response = await categoryService.createCategory(category);
             return response.data;
         },
@@ -343,9 +303,6 @@ export function useCreateCategory() {
     });
 }
 
-/**
- * Update an existing category
- */
 export function useUpdateCategory() {
     const queryClient = useQueryClient();
 
@@ -361,9 +318,6 @@ export function useUpdateCategory() {
     });
 }
 
-/**
- * Delete a category
- */
 export function useDeleteCategory() {
     const queryClient = useQueryClient();
 
@@ -376,78 +330,3 @@ export function useDeleteCategory() {
         },
     });
 }
-
-// =============================================================================
-// UTILITY HOOKS
-// =============================================================================
-
-/**
- * Prefetch providers products for better UX
- */
-export function usePrefetchProviderProducts(providerId: string) {
-    const queryClient = useQueryClient();
-
-    return () => {
-        queryClient.prefetchQuery({
-            queryKey: ['providers-products', providerId, 0, 20],
-            queryFn: async () => {
-                return await shopProviderService.getProviderProducts(providerId, 0, 20);
-            },
-        });
-    };
-}
-
-/**
- * Prefetch product details for better UX
- */
-export function usePrefetchProduct(productId: string) {
-    const queryClient = useQueryClient();
-
-    return () => {
-        queryClient.prefetchQuery({
-            queryKey: ['product', productId],
-            queryFn: async () => {
-                const response = await shopProductService.getProductById(productId);
-                return response.data;
-            },
-        });
-    };
-}
-
-// =============================================================================
-// EXPORT ALL HOOKS
-// =============================================================================
-
-export default {
-    // Providers
-    useProviders,
-    useProviderById,
-    useProviderProducts,
-    useCreateProvider,
-    useUpdateProvider,
-    useToggleProviderStatus,
-
-    // Products
-    useProductById,
-    useSearchProducts,
-    useCreateProduct,
-    useUpdateProduct,
-    useDeleteProduct,
-
-    // Variants
-    useProductVariants,
-    useCreateVariant,
-    useUpdateVariant,
-    useDeleteVariant,
-
-    // Categories
-    useCategories,
-    useCategoryById,
-    useCreateCategory,
-    useUpdateCategory,
-    useDeleteCategory,
-
-    // Utilities
-    usePrefetchProviderProducts,
-    usePrefetchProduct,
-};
