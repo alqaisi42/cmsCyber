@@ -2,8 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { AlertCircle, ArrowLeft, Loader2, PackagePlus } from 'lucide-react';
-import { useProviderById } from '../../../../../../presentation/hooks/useShop';
-import { ProductForm } from '../../../../../../presentation/components/shop/ProductForm';
+import { useProviderById } from '@/presentation/hooks/useShop';
+import { ProductForm } from '@/presentation/components/shop/ProductForm';
 
 export default function CreateProviderProductPage() {
     const params = useParams();

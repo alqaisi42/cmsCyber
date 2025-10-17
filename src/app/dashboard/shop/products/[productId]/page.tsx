@@ -17,10 +17,10 @@ import {
     Tag,
     XCircle,
 } from 'lucide-react';
-import { Image360Viewer } from '../../../../../presentation/components/shop/Image360Viewer';
-import { useProductDetails } from '../../../../../presentation/hooks/useProductDetails';
-import { collectVariantMedia } from '../../../../../presentation/utils/variantMedia';
-import type { ProductImage } from '../../../../../infrastructure/services/product-image.service';
+import { Image360Viewer } from '@/presentation/components/shop/Image360Viewer';
+import { useProductDetails } from '@/presentation/hooks/useProductDetails';
+import { collectVariantMedia } from '@/presentation/utils/variantMedia';
+import type { ProductImage } from '@/infrastructure/services/product-image.service';
 
 function formatCurrency(value: number | null | undefined) {
     if (value === null || value === undefined || Number.isNaN(value)) {

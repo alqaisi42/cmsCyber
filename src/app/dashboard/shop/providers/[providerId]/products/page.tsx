@@ -18,14 +18,11 @@ import {
     AlertCircle,
     Palette
 } from 'lucide-react';
-import type {
-    ShopProduct,
-    ProductVariant,
-} from '../../../../../../core/entities/ecommerce';
-import { useProviderProducts, useProviderById, useProductVariants } from '../../../../../../presentation/hooks/useShop';
-import { Modal } from '../../../../../../presentation/components/ui/Modal';
-import { Image360Viewer } from '../../../../../../presentation/components/shop/Image360Viewer';
-import { collectVariantMedia } from '../../../../../../presentation/utils/variantMedia';
+import type { ShopProduct, ProductVariant } from '@/core/entities/ecommerce';
+import { useProviderProducts, useProviderById, useProductVariants } from '@/presentation/hooks/useShop';
+import { Modal } from '@/presentation/components/ui/Modal';
+import { Image360Viewer } from '@/presentation/components/shop/Image360Viewer';
+import { collectVariantMedia } from '@/presentation/utils/variantMedia';
 
 type ProviderProduct = ShopProduct & {
     imageUrl?: string | null;
