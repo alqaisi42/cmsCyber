@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-// Root layout with React Query provider
+// Root layout with React Query providers
 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';

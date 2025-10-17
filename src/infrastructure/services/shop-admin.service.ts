@@ -85,7 +85,7 @@ class ShopProviderService {
     ): Promise<PaginatedResponse<ShopProduct>> {
         const url = `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`;
 
-        console.log('🔵 Fetching provider products:', url);
+        console.log('🔵 Fetching providers products:', url);
 
         const response = await fetch(url, {
             cache: 'no-store',

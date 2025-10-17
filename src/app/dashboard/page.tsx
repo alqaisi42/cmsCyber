@@ -62,7 +62,7 @@ export default function DashboardPage() {
                 id: '1',
                 date: '2024-10-16',
                 title: 'New Provider Registration',
-                description: 'We have updated the provider registration process for better efficiency.'
+                description: 'We have updated the providers registration process for better efficiency.'
             },
             {
                 id: '2',

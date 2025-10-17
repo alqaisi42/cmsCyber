@@ -41,7 +41,7 @@ export interface Patient extends BaseEntity {
 
   // System
   status: PatientStatus;
-  providerId: string; // Assigned clinic/provider
+  providerId: string; // Assigned clinic/providers
 }
 
 export enum Gender {
@@ -100,7 +100,7 @@ export interface Claim extends BaseEntity {
   patient?: Patient; // Populated relation
 
   // Provider/Doctor Information
-  providerId: string; // Clinic/Medical provider
+  providerId: string; // Clinic/Medical providers
   providerName: string;
   doctorId: string;
   doctorName: string;

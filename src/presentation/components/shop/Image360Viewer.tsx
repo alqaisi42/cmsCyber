@@ -1,16 +1,14 @@
-// src/presentation/components/shop/Image360Viewer.tsx
-// NEW - 360° Product Image Viewer
 
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { RotateCw, Maximize2, Minimize2, Play, Pause } from 'lucide-react';
+import { RotateCw, Maximize2, Minimize2, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductImage } from '../../../infrastructure/services/product-image.service';
 
 interface Image360ViewerProps {
     images: ProductImage[];
     autoPlay?: boolean;
-    autoPlaySpeed?: number; // ms per frame
+    autoPlaySpeed?: number;
     className?: string;
 }
 
@@ -28,104 +26,106 @@ export function Image360Viewer({
     const containerRef = useRef<HTMLDivElement>(null);
     const startXRef = useRef(0);
     const currentIndexRef = useRef(0);
-    const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Sort images by sequence
     const sortedImages = [...images].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
     const totalFrames = sortedImages.length;
 
-    // Update current index ref
     useEffect(() => {
         currentIndexRef.current = currentIndex;
     }, [currentIndex]);
 
-    // Auto-play functionality
+    // Auto-play effect
     useEffect(() => {
-        if (isPlaying && totalFrames > 1) {
-            autoPlayRef.current = setInterval(() => {
-                setCurrentIndex(prev => (prev + 1) % totalFrames);
-            }, autoPlaySpeed);
-        }
+        if (!isPlaying || totalFrames <= 1) return;
 
-        return () => {
-            if (autoPlayRef.current) {
-                clearInterval(autoPlayRef.current);
-            }
-        };
+        const interval = setInterval(() => {
+            setCurrentIndex((prev) => (prev + 1) % totalFrames);
+        }, autoPlaySpeed);
+
+        return () => clearInterval(interval);
     }, [isPlaying, totalFrames, autoPlaySpeed]);
 
     // Mouse drag handlers
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const handleMouseDown = (e: React.MouseEvent) => {
         setIsDragging(true);
-        setIsPlaying(false); // Stop auto-play when user interacts
+        setIsPlaying(false);
         startXRef.current = e.clientX;
-    }, []);
+    };
 
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        if (!isDragging || totalFrames <= 1) return;
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!isDragging) return;
 
-        const delta = e.clientX - startXRef.current;
-        const sensitivity = 5; // Pixels per frame
-        const frameDelta = Math.floor(delta / sensitivity);
+        const deltaX = e.clientX - startXRef.current;
+        const sensitivity = 5;
+        const framesToMove = Math.floor(Math.abs(deltaX) / sensitivity);
 
-        if (Math.abs(frameDelta) > 0) {
-            setCurrentIndex(prev => {
-                const newIndex = (prev - frameDelta + totalFrames) % totalFrames;
-                return newIndex;
-            });
+        if (framesToMove > 0) {
+            const direction = deltaX > 0 ? 1 : -1;
+            const newIndex = (currentIndexRef.current + direction * framesToMove + totalFrames) % totalFrames;
+            setCurrentIndex(newIndex);
             startXRef.current = e.clientX;
         }
     }, [isDragging, totalFrames]);
 
-    const handleMouseUp = useCallback(() => {
+    const handleMouseUp = () => {
         setIsDragging(false);
-    }, []);
+    };
 
-    // Touch handlers for mobile
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    useEffect(() => {
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isDragging, handleMouseMove]);
+
+    // Touch handlers
+    const handleTouchStart = (e: React.TouchEvent) => {
         setIsDragging(true);
         setIsPlaying(false);
         startXRef.current = e.touches[0].clientX;
-    }, []);
+    };
 
-    const handleTouchMove = useCallback((e: React.TouchEvent) => {
-        if (!isDragging || totalFrames <= 1) return;
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging) return;
 
-        const delta = e.touches[0].clientX - startXRef.current;
+        const deltaX = e.touches[0].clientX - startXRef.current;
         const sensitivity = 5;
-        const frameDelta = Math.floor(delta / sensitivity);
+        const framesToMove = Math.floor(Math.abs(deltaX) / sensitivity);
 
-        if (Math.abs(frameDelta) > 0) {
-            setCurrentIndex(prev => {
-                const newIndex = (prev - frameDelta + totalFrames) % totalFrames;
-                return newIndex;
-            });
+        if (framesToMove > 0) {
+            const direction = deltaX > 0 ? 1 : -1;
+            const newIndex = (currentIndexRef.current + direction * framesToMove + totalFrames) % totalFrames;
+            setCurrentIndex(newIndex);
             startXRef.current = e.touches[0].clientX;
         }
-    }, [isDragging, totalFrames]);
+    };
 
-    const handleTouchEnd = useCallback(() => {
+    const handleTouchEnd = () => {
         setIsDragging(false);
-    }, []);
+    };
 
-    // Fullscreen toggle
-    const toggleFullscreen = useCallback(() => {
-        if (!containerRef.current) return;
+    const nextFrame = () => {
+        setCurrentIndex((prev) => (prev + 1) % totalFrames);
+    };
 
-        if (!isFullscreen) {
-            if (containerRef.current.requestFullscreen) {
-                containerRef.current.requestFullscreen();
-                setIsFullscreen(true);
-            }
+    const prevFrame = () => {
+        setCurrentIndex((prev) => (prev - 1 + totalFrames) % totalFrames);
+    };
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            containerRef.current?.requestFullscreen();
+            setIsFullscreen(true);
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-                setIsFullscreen(false);
-            }
+            document.exitFullscreen();
+            setIsFullscreen(false);
         }
-    }, [isFullscreen]);
+    };
 
-    // Prevent empty state
     if (totalFrames === 0) {
         return (
             <div className="flex items-center justify-center h-96 bg-slate-100 rounded-lg">
@@ -134,74 +134,91 @@ export function Image360Viewer({
         );
     }
 
-    const currentImage = sortedImages[currentIndex];
-
     return (
         <div
             ref={containerRef}
-            className={`relative bg-slate-50 rounded-lg overflow-hidden ${className} ${
-                isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
-            }`}
+            className={`relative bg-slate-900 rounded-lg overflow-hidden ${className}`}
         >
             {/* Main Image */}
             <div
-                className={`relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className="relative cursor-grab active:cursor-grabbing select-none"
                 onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
                 <img
-                    src={currentImage.imageUrl}
-                    alt={currentImage.altText || `360 view frame ${currentIndex + 1}`}
-                    className="w-full h-auto object-contain"
+                    src={sortedImages[currentIndex].imageUrl}
+                    alt={`360° view frame ${currentIndex + 1}`}
+                    className="w-full h-auto"
                     draggable={false}
                 />
 
-                {/* Drag hint */}
-                {!isDragging && totalFrames > 1 && (
+                {/* Drag Hint */}
+                {!isDragging && currentIndex === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="bg-black/50 text-white px-4 py-2 rounded-lg backdrop-blur-sm flex items-center gap-2">
-                            <RotateCw className="w-4 h-4 animate-spin" />
-                            <span className="text-sm">Drag to rotate</span>
+                        <div className="bg-black/70 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                            <RotateCw className="w-5 h-5" />
+                            <span>Drag to rotate</span>
                         </div>
                     </div>
                 )}
             </div>
 
             {/* Controls */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg px-4 py-2 flex items-center gap-3">
-                {/* Play/Pause */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/70 backdrop-blur-sm px-4 py-2 rounded-full">
                 <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                    title={isPlaying ? 'Pause' : 'Play'}
+                    onClick={prevFrame}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    title="Previous frame"
                 >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    <ChevronLeft className="w-5 h-5 text-white" />
                 </button>
 
-                {/* Frame indicator */}
-                <span className="text-sm font-medium text-slate-700">
-          {currentIndex + 1} / {totalFrames}
-        </span>
+                <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    title={isPlaying ? 'Pause' : 'Play'}
+                >
+                    {isPlaying ? (
+                        <Pause className="w-5 h-5 text-white" />
+                    ) : (
+                        <Play className="w-5 h-5 text-white" />
+                    )}
+                </button>
 
-                {/* Fullscreen toggle */}
+                <button
+                    onClick={nextFrame}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    title="Next frame"
+                >
+                    <ChevronRight className="w-5 h-5 text-white" />
+                </button>
+
+                <div className="w-px h-6 bg-white/20 mx-1" />
+
                 <button
                     onClick={toggleFullscreen}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
                     title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                 >
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    {isFullscreen ? (
+                        <Minimize2 className="w-5 h-5 text-white" />
+                    ) : (
+                        <Maximize2 className="w-5 h-5 text-white" />
+                    )}
                 </button>
             </div>
 
-            {/* Progress bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-200">
+            {/* Frame Counter */}
+            <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm font-medium">
+                {currentIndex + 1} / {totalFrames}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
                 <div
-                    className="h-full bg-blue-600 transition-all duration-100"
+                    className="h-full bg-blue-500 transition-all duration-100"
                     style={{ width: `${((currentIndex + 1) / totalFrames) * 100}%` }}
                 />
             </div>

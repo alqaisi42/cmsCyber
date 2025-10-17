@@ -1,6 +1,15 @@
-// src/infrastructure/services/shop-admin.service.ts
-// COMPLETE FIX - Handles API response structure correctly
+// =============================================================================
+// src/presentation/hooks/useShop.ts
+// COMPLETE FILE - All React Query Hooks for Shop System
+// =============================================================================
 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+    shopProviderService,
+    shopProductService,
+    productVariantService,
+    categoryService,
+} from '../../infrastructure/services/shop-admin.service';
 import {
     ShopProvider,
     ShopProduct,
@@ -9,311 +18,436 @@ import {
     CreateProductRequest,
     CreateVariantRequest,
     ProductSearchParams,
-    ProviderStatsResponse
+    ProviderStatsResponse,
 } from '../../core/entities/ecommerce';
-import { PaginatedResponse } from "../../core/interfaces/repositories";
+import { PaginatedResponse } from '../../core/interfaces/repositories';
 
-// ============================================================================
-// API RESPONSE TYPES
-// ============================================================================
+// =============================================================================
+// PROVIDER HOOKS
+// =============================================================================
 
-interface SpringBootPageResponse<T> {
-    content: T[];
-    pageable: {
-        pageNumber: number;
-        pageSize: number;
+/**
+ * Fetch all providers with statistics
+ */
+export function useProviders() {
+    return useQuery<ProviderStatsResponse[], Error>({
+        queryKey: ['providers'],
+        queryFn: async () => {
+            const response = await shopProviderService.getProviders();
+            return response.data;
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+
+/**
+ * Fetch a single providers by ID
+ */
+export function useProviderById(providerId: string) {
+    return useQuery<ShopProvider, Error>({
+        queryKey: ['provider', providerId],
+        queryFn: async () => {
+            const response = await shopProviderService.getProviderById(providerId);
+            return response.data;
+        },
+        enabled: !!providerId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+/**
+ * Fetch products for a specific providers with pagination
+ */
+export function useProviderProducts(
+    providerId: string,
+    page: number = 0,
+    size: number = 20
+) {
+    return useQuery<PaginatedResponse<ShopProduct>, Error>({
+        queryKey: ['providers-products', providerId, page, size],
+        queryFn: async () => {
+            return await shopProviderService.getProviderProducts(providerId, page, size);
+        },
+        enabled: !!providerId,
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+}
+
+/**
+ * Create a new providers
+ */
+export function useCreateProvider() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>) => {
+            const response = await shopProviderService.createProvider(provider);
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['providers'] });
+        },
+    });
+}
+
+/**
+ * Update an existing providers
+ */
+export function useUpdateProvider() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Partial<ShopProvider> }) => {
+            const response = await shopProviderService.updateProvider(id, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['providers'] });
+            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+        },
+    });
+}
+
+/**
+ * Toggle providers active status
+ */
+export function useToggleProviderStatus() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+            const response = await shopProviderService.toggleProviderStatus(id, isActive);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['providers'] });
+            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+        },
+    });
+}
+
+// =============================================================================
+// PRODUCT HOOKS
+// =============================================================================
+
+/**
+ * Fetch a single product by ID
+ */
+export function useProductById(productId: string) {
+    return useQuery<ShopProduct, Error>({
+        queryKey: ['product', productId],
+        queryFn: async () => {
+            const response = await shopProductService.getProductById(productId);
+            return response.data;
+        },
+        enabled: !!productId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+/**
+ * Search products with filters and pagination
+ */
+export function useSearchProducts(params: ProductSearchParams) {
+    return useQuery<PaginatedResponse<ShopProduct>, Error>({
+        queryKey: ['products-search', params],
+        queryFn: async () => {
+            return await shopProductService.searchProducts(params);
+        },
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
+/**
+ * Create a new product with variants
+ */
+export function useCreateProduct() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (request: CreateProductRequest) => {
+            const response = await shopProductService.createProduct(request);
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['products-search'] });
+            queryClient.invalidateQueries({ queryKey: ['providers-products'] });
+        },
+    });
+}
+
+/**
+ * Update an existing product
+ */
+export function useUpdateProduct() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Partial<ShopProduct> }) => {
+            const response = await shopProductService.updateProduct(id, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['product', data.id] });
+            queryClient.invalidateQueries({ queryKey: ['products-search'] });
+            queryClient.invalidateQueries({ queryKey: ['providers-products', data.providerId] });
+        },
+    });
+}
+
+/**
+ * Delete a product
+ */
+export function useDeleteProduct() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (productId: string) => {
+            await shopProductService.deleteProduct(productId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['products-search'] });
+            queryClient.invalidateQueries({ queryKey: ['providers-products'] });
+        },
+    });
+}
+
+// =============================================================================
+// VARIANT HOOKS
+// =============================================================================
+
+/**
+ * Fetch all variants for a product
+ */
+export function useProductVariants(productId: string) {
+    return useQuery<ProductVariant[], Error>({
+        queryKey: ['product-variants', productId],
+        queryFn: async () => {
+            const response = await productVariantService.getProductVariants(productId);
+            return response.data || [];
+        },
+        enabled: !!productId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+/**
+ * Create a new variant for a product
+ */
+export function useCreateVariant() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+                               productId,
+                               request,
+                           }: {
+            productId: string;
+            request: CreateVariantRequest;
+        }) => {
+            const response = await productVariantService.createVariant(productId, request);
+            return response.data;
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['product-variants', variables.productId] });
+            queryClient.invalidateQueries({ queryKey: ['product', variables.productId] });
+        },
+    });
+}
+
+/**
+ * Update an existing variant
+ */
+export function useUpdateVariant() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Partial<ProductVariant> }) => {
+            const response = await productVariantService.updateVariant(id, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['product-variants', data.productId] });
+            queryClient.invalidateQueries({ queryKey: ['product', data.productId] });
+        },
+    });
+}
+
+/**
+ * Delete a variant
+ */
+export function useDeleteVariant() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ variantId, productId }: { variantId: string; productId: string }) => {
+            await productVariantService.deleteVariant(variantId);
+            return productId;
+        },
+        onSuccess: (productId) => {
+            queryClient.invalidateQueries({ queryKey: ['product-variants', productId] });
+            queryClient.invalidateQueries({ queryKey: ['product', productId] });
+        },
+    });
+}
+
+// =============================================================================
+// CATEGORY HOOKS
+// =============================================================================
+
+/**
+ * Fetch all categories
+ */
+export function useCategories() {
+    return useQuery<Category[], Error>({
+        queryKey: ['categories'],
+        queryFn: async () => {
+            const response = await categoryService.getCategories();
+            return response.data;
+        },
+        staleTime: 10 * 60 * 1000, // 10 minutes
+    });
+}
+
+/**
+ * Fetch a single category by ID
+ */
+export function useCategoryById(categoryId: string) {
+    return useQuery<Category, Error>({
+        queryKey: ['category', categoryId],
+        queryFn: async () => {
+            const response = await categoryService.getCategoryById(categoryId);
+            return response.data;
+        },
+        enabled: !!categoryId,
+        staleTime: 10 * 60 * 1000,
+    });
+}
+
+/**
+ * Create a new category
+ */
+export function useCreateCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (
+            category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>
+        ) => {
+            const response = await categoryService.createCategory(category);
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+        },
+    });
+}
+
+/**
+ * Update an existing category
+ */
+export function useUpdateCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Partial<Category> }) => {
+            const response = await categoryService.updateCategory(id, data);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({ queryKey: ['category', data.id] });
+        },
+    });
+}
+
+/**
+ * Delete a category
+ */
+export function useDeleteCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (categoryId: string) => {
+            await categoryService.deleteCategory(categoryId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+        },
+    });
+}
+
+// =============================================================================
+// UTILITY HOOKS
+// =============================================================================
+
+/**
+ * Prefetch providers products for better UX
+ */
+export function usePrefetchProviderProducts(providerId: string) {
+    const queryClient = useQueryClient();
+
+    return () => {
+        queryClient.prefetchQuery({
+            queryKey: ['providers-products', providerId, 0, 20],
+            queryFn: async () => {
+                return await shopProviderService.getProviderProducts(providerId, 0, 20);
+            },
+        });
     };
-    totalPages: number;
-    totalElements: number;
 }
 
-interface ApiResponse<T> {
-    success: boolean;
-    data: T;
-    message?: string;
-    errors?: string[];
-    timestamp?: string;
-}
+/**
+ * Prefetch product details for better UX
+ */
+export function usePrefetchProduct(productId: string) {
+    const queryClient = useQueryClient();
 
-// ============================================================================
-// TRANSFORM FUNCTION
-// ============================================================================
-
-function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<T>): PaginatedResponse<T> {
-    return {
-        data: springResponse.content || [],
-        total: springResponse.totalElements || 0,
-        page: springResponse.pageable?.pageNumber || 0,
-        limit: springResponse.pageable?.pageSize || 20,
-        totalPages: springResponse.totalPages || 0
+    return () => {
+        queryClient.prefetchQuery({
+            queryKey: ['product', productId],
+            queryFn: async () => {
+                const response = await shopProductService.getProductById(productId);
+                return response.data;
+            },
+        });
     };
 }
 
-// ============================================================================
-// PROVIDER SERVICE
-// ============================================================================
+// =============================================================================
+// EXPORT ALL HOOKS
+// =============================================================================
 
-class ShopProviderService {
-    private readonly baseUrl = '/api/v1/providers';
+export default {
+    // Providers
+    useProviders,
+    useProviderById,
+    useProviderProducts,
+    useCreateProvider,
+    useUpdateProvider,
+    useToggleProviderStatus,
 
-    async getProviders(): Promise<ApiResponse<ProviderStatsResponse[]>> {
-        const response = await fetch(this.baseUrl, {
-            headers: { 'Accept': 'application/json' },
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
+    // Products
+    useProductById,
+    useSearchProducts,
+    useCreateProduct,
+    useUpdateProduct,
+    useDeleteProduct,
 
-    async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
+    // Variants
+    useProductVariants,
+    useCreateVariant,
+    useUpdateVariant,
+    useDeleteVariant,
 
-    /**
-     * ✅ FIXED: Properly handles nested response structure
-     * Backend returns: { success: true, data: { content: [...], totalElements: 156 } }
-     * We transform to: { data: [...], total: 156, totalPages: 8, page: 0, limit: 20 }
-     */
-    async getProviderProducts(
-        providerId: string,
-        page: number = 0,
-        size: number = 20
-    ): Promise<PaginatedResponse<ShopProduct>> {
-        const url = `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`;
+    // Categories
+    useCategories,
+    useCategoryById,
+    useCreateCategory,
+    useUpdateCategory,
+    useDeleteCategory,
 
-        console.log('🔵 Fetching provider products:', url);
-
-        const response = await fetch(url, {
-            cache: 'no-store',
-            headers: { 'Accept': 'application/json' }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Get the wrapped response
-        const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
-
-        console.log('🔵 Raw API Response:', apiResponse);
-        console.log('🔵 Nested data:', apiResponse.data);
-
-        // Transform the nested Spring Boot response to our format
-        const transformed = transformToPaginatedResponse(apiResponse.data);
-
-        console.log('✅ Transformed Response:', transformed);
-
-        return transformed;
-    }
-
-    async createProvider(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ShopProvider>> {
-        const response = await fetch(this.baseUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(provider)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async updateProvider(id: string, provider: Partial<ShopProvider>): Promise<ApiResponse<ShopProvider>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(provider)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async toggleProviderStatus(id: string, isActive: boolean): Promise<ApiResponse<ShopProvider>> {
-        return this.updateProvider(id, { isActive });
-    }
-}
-
-// ============================================================================
-// PRODUCT SERVICE
-// ============================================================================
-
-class ShopProductService {
-    private readonly baseUrl = '/api/v1/products';
-
-    async createProduct(request: CreateProductRequest): Promise<ApiResponse<{ id: string }>> {
-        const response = await fetch(this.baseUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async getProductById(id: string): Promise<ApiResponse<ShopProduct>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async updateProduct(id: string, product: Partial<ShopProduct>): Promise<ApiResponse<ShopProduct>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(product)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async deleteProduct(id: string): Promise<ApiResponse<void>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    /**
-     * ✅ FIXED: Search products with proper transformation
-     */
-    async searchProducts(params: ProductSearchParams): Promise<PaginatedResponse<ShopProduct>> {
-        const queryParams = new URLSearchParams();
-        if (params.keyword) queryParams.append('keyword', params.keyword);
-        if (params.categoryId) queryParams.append('categoryId', params.categoryId);
-        if (params.providerId) queryParams.append('providerId', params.providerId);
-        if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
-        if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
-        if (params.isOnSale !== undefined) queryParams.append('isOnSale', params.isOnSale.toString());
-        if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-        queryParams.append('page', params.page.toString());
-        queryParams.append('size', params.size.toString());
-
-        const response = await fetch(`${this.baseUrl}/search?${queryParams.toString()}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const apiResponse: ApiResponse<SpringBootPageResponse<ShopProduct>> = await response.json();
-        return transformToPaginatedResponse(apiResponse.data);
-    }
-}
-
-// ============================================================================
-// VARIANT SERVICE
-// ============================================================================
-
-class ProductVariantService {
-    /**
-     * Get all variants for a product
-     */
-    async getProductVariants(productId: string): Promise<ApiResponse<ProductVariant[]>> {
-        const response = await fetch(`/api/v1/products/${productId}/variants`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    /**
-     * Create a new variant
-     */
-    async createVariant(productId: string, request: CreateVariantRequest): Promise<ApiResponse<ProductVariant>> {
-        const response = await fetch(`/api/v1/products/${productId}/variants`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    /**
-     * Update a variant
-     */
-    async updateVariant(variantId: string, variant: Partial<ProductVariant>): Promise<ApiResponse<ProductVariant>> {
-        const response = await fetch(`/api/v1/variants/${variantId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(variant)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    /**
-     * Delete a variant
-     */
-    async deleteVariant(variantId: string): Promise<ApiResponse<void>> {
-        const response = await fetch(`/api/v1/variants/${variantId}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-}
-
-// ============================================================================
-// CATEGORY SERVICE
-// ============================================================================
-
-class CategoryService {
-    private readonly baseUrl = '/api/v1/categories';
-
-    async getCategories(): Promise<ApiResponse<Category[]>> {
-        const response = await fetch(this.baseUrl, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async getCategoryById(id: string): Promise<ApiResponse<Category>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>): Promise<ApiResponse<Category>> {
-        const response = await fetch(this.baseUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(category)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async updateCategory(id: string, category: Partial<Category>): Promise<ApiResponse<Category>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(category)
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-
-    async deleteCategory(id: string): Promise<ApiResponse<void>> {
-        const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    }
-}
-
-// ============================================================================
-// EXPORT SINGLETONS
-// ============================================================================
-
-export const shopProviderService = new ShopProviderService();
-export const shopProductService = new ShopProductService();
-export const productVariantService = new ProductVariantService();
-export const categoryService = new CategoryService();
+    // Utilities
+    usePrefetchProviderProducts,
+    usePrefetchProduct,
+};
