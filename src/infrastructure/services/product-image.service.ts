@@ -1,21 +1,16 @@
 // src/infrastructure/services/product-image.service.ts
-// FIXED - Define ApiResponse here
+// Enhanced product image service with upload helpers
 
-// ============================================================================
-// API RESPONSE TYPE
-// ============================================================================
+// =============================================================================
+// IMPORTS
+// =============================================================================
 
-interface ApiResponse<T> {
-    success: boolean;
-    data: T;
-    message: string;
-    errors?: string[];
-    timestamp: string;
-}
+import { CreateImageRequest } from '../../core/entities/ecommerce';
+import { ApiResponse } from '../../core/interfaces/repositories';
 
-// ============================================================================
+// =============================================================================
 // PRODUCT IMAGE TYPES
-// ============================================================================
+// =============================================================================
 
 export interface ProductImage {
     id: string;
@@ -41,9 +36,36 @@ export interface GroupedImages {
     allRegular: ProductImage[];
 }
 
-// ============================================================================
+export interface UploadImageMetadata {
+    filename: string;
+    imageType: 'regular' | 'rotation360' | '360' | 'thumbnail';
+    sequenceOrder?: number;
+    isPrimary?: boolean;
+    associatedColor?: string;
+    variantId?: string;
+    rotationFrameNumber?: number;
+}
+
+export interface UploadImagesResponse {
+    uploadedImages: Array<{
+        id: string;
+        filename: string;
+        imageUrl: string;
+        imageType: 'regular' | 'rotation360' | '360' | 'thumbnail';
+        fileSize: number;
+        isPrimary: boolean;
+    }>;
+    failedUploads: Array<{
+        filename: string;
+        reason?: string;
+    }>;
+    totalUploaded: number;
+    totalFailed: number;
+}
+
+// =============================================================================
 // PRODUCT IMAGE SERVICE
-// ============================================================================
+// =============================================================================
 
 class ProductImageService {
     private readonly baseUrl = '/api/v1';
@@ -53,7 +75,34 @@ class ProductImageService {
      */
     async getProductImages(productId: string): Promise<ApiResponse<ProductImage[]>> {
         const response = await fetch(`${this.baseUrl}/products/${productId}/images`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    }
+
+    /**
+     * Create a single product image record
+     */
+    async createProductImage(
+        productId: string,
+        payload: CreateImageRequest
+    ): Promise<ApiResponse<ProductImage>> {
+        const response = await fetch(`${this.baseUrl}/products/${productId}/images`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
         return response.json();
     }
 
@@ -66,7 +115,7 @@ class ProductImageService {
             byVariant: {},
             byColor: {},
             all360: [],
-            allRegular: []
+            allRegular: [],
         };
 
         // Sort by sequence order first
@@ -129,6 +178,41 @@ class ProductImageService {
         }
 
         return filtered.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    }
+
+    /**
+     * Upload a list of product images with metadata
+     */
+    async uploadProductImages(
+        productId: string,
+        files: File[],
+        metadata: UploadImageMetadata[] = []
+    ): Promise<ApiResponse<UploadImagesResponse>> {
+        if (!files.length) {
+            throw new Error('At least one file is required to upload images');
+        }
+
+        const formData = new FormData();
+        files.forEach(file => formData.append('files', file));
+
+        if (metadata.length) {
+            formData.append('metadata', JSON.stringify(metadata));
+        }
+
+        const response = await fetch(`${this.baseUrl}/products/images/upload/${productId}`, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        return response.json();
     }
 }
 

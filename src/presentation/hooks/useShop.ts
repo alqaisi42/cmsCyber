@@ -11,6 +11,10 @@ import {
     categoryService,
 } from '../../infrastructure/services/shop-admin.service';
 import {
+    productImageService,
+    UploadImageMetadata,
+} from '../../infrastructure/services/product-image.service';
+import {
     ShopProvider,
     ShopProduct,
     ShopProductDetail,
@@ -18,6 +22,7 @@ import {
     Category,
     CreateProductRequest,
     CreateVariantRequest,
+    CreateImageRequest,
     ProductSearchParams,
     ProviderStatsResponse,
 } from '../../core/entities/ecommerce';
@@ -223,6 +228,52 @@ export function useCreateVariant() {
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['product-variants', variables.productId] });
             queryClient.invalidateQueries({ queryKey: ['product', variables.productId] });
+        },
+    });
+}
+
+// =============================================================================
+// PRODUCT IMAGE HOOKS - NEW
+// =============================================================================
+
+export function useCreateProductImage() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            productId,
+            image,
+        }: {
+            productId: string;
+            image: CreateImageRequest;
+        }) => {
+            const response = await productImageService.createProductImage(productId, image);
+            return response.data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['product-images', variables.productId] });
+        },
+    });
+}
+
+export function useUploadProductImages() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            productId,
+            files,
+            metadata,
+        }: {
+            productId: string;
+            files: File[];
+            metadata?: UploadImageMetadata[];
+        }) => {
+            const response = await productImageService.uploadProductImages(productId, files, metadata ?? []);
+            return response.data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['product-images', variables.productId] });
         },
     });
 }
