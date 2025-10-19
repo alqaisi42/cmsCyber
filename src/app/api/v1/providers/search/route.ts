@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
-// 1️⃣ Providers API Route
-// File: src/app/api/v1/providers/route.ts
+// Providers Search API Route
+// File: src/app/api/v1/providers/search/route.ts
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,11 +24,11 @@ function createHeaders(request: NextRequest): HeadersInit {
 async function forwardResponse(response: Response) {
     if (!response.ok) {
         const errorText = await response.text().catch(() => '');
-        console.error('Provider API Error Response:', errorText);
+        console.error('Provider search API error:', errorText);
         return NextResponse.json(
             {
                 success: false,
-                message: 'Provider service request failed',
+                message: 'Provider search request failed',
                 error: errorText || undefined,
             },
             { status: response.status },
@@ -39,27 +39,10 @@ async function forwardResponse(response: Response) {
     return NextResponse.json(data, { status: response.status });
 }
 
-export async function GET(request: NextRequest) {
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/v1/providers`, {
-            headers: createHeaders(request),
-            cache: 'no-store',
-        });
-
-        return await forwardResponse(response);
-    } catch (error) {
-        console.error('Provider API Error:', error);
-        return NextResponse.json(
-            { success: false, message: 'Internal server error' },
-            { status: 500 },
-        );
-    }
-}
-
 export async function POST(request: NextRequest) {
     try {
         const payload = await request.json();
-        const response = await fetch(`${BACKEND_URL}/api/v1/providers`, {
+        const response = await fetch(`${BACKEND_URL}/api/v1/providers/search`, {
             method: 'POST',
             headers: createHeaders(request),
             body: JSON.stringify(payload),
@@ -68,7 +51,7 @@ export async function POST(request: NextRequest) {
 
         return await forwardResponse(response);
     } catch (error) {
-        console.error('Create Provider API Error:', error);
+        console.error('Provider search API unexpected error:', error);
         return NextResponse.json(
             { success: false, message: 'Internal server error' },
             { status: 500 },

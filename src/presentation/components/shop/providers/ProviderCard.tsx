@@ -1,21 +1,21 @@
 // File: src/presentation/components/shop/providers/ProviderCard.tsx
 import { memo } from 'react';
 import {
-    Store, Star, Package, TrendingUp, TrendingDown,
-    MoreVertical, Eye, Edit, Pause, Play, ChevronRight,
+    Store, Star, Package, TrendingUp,
+    MoreVertical, Eye, Edit, Pause, Play,
     DollarSign, Clock, RotateCcw, Users
 } from 'lucide-react';
-import { ProviderStatsResponse } from '@/core/entities/ecommerce';
+import { ProviderSummary } from '@/core/entities/ecommerce';
 
 import {ProviderMetrics} from "@/core/types/provider.types";
 import {cn, formatCurrency, formatNumber} from "@/shared/utils/cn";
 
 interface ProviderCardProps {
-    provider: ProviderStatsResponse;
+    provider: ProviderSummary;
     metrics?: ProviderMetrics;
     onViewDetails: (id: string) => void;
     onEdit?: (id: string) => void;
-    onToggleStatus?: (id: string, isActive: boolean) => void;
+    onToggleStatus?: (id: string) => void;
     variant?: 'default' | 'compact' | 'detailed';
     isSelected?: boolean;
 }
@@ -30,13 +30,11 @@ export const ProviderCard = memo(function ProviderCard({
                                                            isSelected = false
                                                        }: ProviderCardProps) {
     const rating = provider.rating ?? 0;
-    const totalProducts = provider.totalProducts ?? 0;
-    const productsInStock = provider.productsInStock ?? 0;
-    const averagePrice = provider.averagePrice ?? 0;
-
-    const stockPercentage = totalProducts > 0
-        ? (productsInStock / totalProducts) * 100
-        : 0;
+    const totalProducts = provider.productsCount ?? provider.activeProductsCount ?? 0;
+    const activeProducts = provider.activeProductsCount ?? provider.productsCount ?? 0;
+    const averagePrice = provider.averageProductPrice ?? 0;
+    const commission = provider.commissionPercentage ?? 0;
+    const revenue = provider.totalRevenue ?? null;
 
     const handleCardClick = () => {
         onViewDetails(provider.id);
@@ -144,72 +142,58 @@ export const ProviderCard = memo(function ProviderCard({
                         <p className="text-xl font-bold text-slate-900">
                             {formatNumber(totalProducts)}
                         </p>
-                        <div className="mt-1">
-                            <div className="flex items-center gap-1">
-                                <div className="flex-1 bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                    <div
-                                        className="h-full bg-green-500 transition-all duration-500"
-                                        style={{ width: `${stockPercentage}%` }}
-                                    />
-                                </div>
-                                <span className="text-xs text-slate-500">
-                  {stockPercentage.toFixed(0)}%
-                </span>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-0.5">in stock</p>
-                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Active: {formatNumber(activeProducts)}
+                        </p>
                     </div>
 
-                    {/* Average Price Metric */}
                     <div className="bg-slate-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-1">
                             <DollarSign className="w-4 h-4 text-slate-400" />
-                            <span className="text-xs text-slate-500">Avg Price</span>
+                            <span className="text-xs text-slate-500">Commission</span>
                         </div>
                         <p className="text-xl font-bold text-slate-900">
-                            {formatCurrency(averagePrice)}
+                            {commission.toFixed(1)}%
                         </p>
-                        {metrics && (
-                            <div className="flex items-center gap-1 mt-1">
-                                {metrics.revenueGrowth >= 0 ? (
-                                    <TrendingUp className="w-3 h-3 text-green-500" />
-                                ) : (
-                                    <TrendingDown className="w-3 h-3 text-red-500" />
-                                )}
-                                <span className={cn(
-                                    "text-xs font-medium",
-                                    metrics.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
-                                )}>
-                  {Math.abs(metrics.revenueGrowth).toFixed(1)}%
-                </span>
-                            </div>
-                        )}
+                        <p className="text-xs text-slate-500 mt-1">
+                            Avg price: {formatCurrency(averagePrice)}
+                        </p>
                     </div>
                 </div>
 
                 {/* Extended Metrics (if available) */}
-                {metrics && variant === 'detailed' && (
+                {(metrics || revenue !== null) && variant === 'detailed' && (
                     <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100">
-                        <MetricBadge
-                            icon={<Users className="w-3 h-3" />}
-                            value={metrics.orderCount30Days}
-                            label="Orders"
-                        />
-                        <MetricBadge
-                            icon={<Clock className="w-3 h-3" />}
-                            value={`${metrics.avgFulfillmentTime}h`}
-                            label="Fulfill"
-                        />
-                        <MetricBadge
-                            icon={<RotateCcw className="w-3 h-3" />}
-                            value={`${metrics.returnRate}%`}
-                            label="Returns"
-                        />
-                        <MetricBadge
-                            icon={<Star className="w-3 h-3" />}
-                            value={metrics.customerSatisfaction.toFixed(1)}
-                            label="CSAT"
-                        />
+                        {metrics ? (
+                            <>
+                                <MetricBadge
+                                    icon={<Users className="w-3 h-3" />}
+                                    value={metrics.orderCount30Days}
+                                    label="Orders"
+                                />
+                                <MetricBadge
+                                    icon={<Clock className="w-3 h-3" />}
+                                    value={`${metrics.avgFulfillmentTime}h`}
+                                    label="Fulfill"
+                                />
+                                <MetricBadge
+                                    icon={<RotateCcw className="w-3 h-3" />}
+                                    value={`${metrics.returnRate}%`}
+                                    label="Returns"
+                                />
+                                <MetricBadge
+                                    icon={<Star className="w-3 h-3" />}
+                                    value={metrics.customerSatisfaction.toFixed(1)}
+                                    label="CSAT"
+                                />
+                            </>
+                        ) : (
+                            <MetricBadge
+                                icon={<TrendingUp className="w-3 h-3" />}
+                                value={revenue ? formatCurrency(revenue) : '—'}
+                                label="Revenue"
+                            />
+                        )}
                     </div>
                 )}
             </div>
@@ -243,7 +227,7 @@ export const ProviderCard = memo(function ProviderCard({
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onToggleStatus(provider.id, !provider.isActive);
+                                onToggleStatus(provider.id);
                             }}
                             className="px-3 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
                             aria-label={provider.isActive ? "Pause provider" : "Activate provider"}

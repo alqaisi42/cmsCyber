@@ -12,9 +12,16 @@ import {
     CreateProductRequest,
     CreateVariantRequest,
     ProductSearchParams,
-    ProviderStatsResponse
+    ProviderSummary,
+    ProviderStatistics,
 } from '../../core/entities/ecommerce';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
+import {
+    ProviderSearchRequest,
+    ProviderSearchResult,
+    CreateProviderRequest,
+    UpdateProviderRequest,
+} from '../../core/types/provider.types';
 
 // ============================================================================
 // SPRING BOOT RESPONSE TYPES
@@ -85,15 +92,69 @@ function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<
 class ShopProviderService {
     private readonly baseUrl = '/api/v1/providers';
 
+    private getAuthHeaders(): Record<string, string> {
+        if (typeof window === 'undefined') {
+            return {};
+        }
+        const token = localStorage.getItem('auth_token');
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    }
+
     /**
-     * Get all providers with statistics
+     * Get all providers (active by default)
      */
-    async getProviders(): Promise<ApiResponse<ProviderStatsResponse[]>> {
+    async getProviders(): Promise<ApiResponse<ProviderSummary[]>> {
         const response = await fetch(this.baseUrl, {
-            cache: 'no-store'
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
+
+        const apiResponse: ApiResponse<ProviderListItem[]> = await response.json();
+        return {
+            success: apiResponse.success,
+            data: apiResponse.data.map(mapProviderListItemToSummary),
+            message: apiResponse.message,
+            errors: apiResponse.errors,
+            timestamp: apiResponse.timestamp,
+        };
+    }
+
+    /**
+     * Search providers with advanced filters and pagination
+     */
+    async searchProviders(params: ProviderSearchRequest): Promise<PaginatedResponse<ProviderSummary>> {
+        const response = await fetch(`${this.baseUrl}/search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
+            body: JSON.stringify({
+                query: params.query ?? '',
+                isActive: params.isActive,
+                minRating: params.minRating,
+                maxCommission: params.maxCommission,
+                hasProducts: params.hasProducts,
+                sortBy: params.sortBy ?? 'NAME',
+                sortDirection: params.sortDirection ?? 'ASC',
+                page: params.page ?? 0,
+                size: params.size ?? 20,
+            }),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const apiResponse: ApiResponse<SpringBootPageResponse<ProviderSearchResult>> = await response.json();
+        const page = apiResponse.data;
+
+        return {
+            data: page.content.map(mapProviderSearchResultToSummary),
+            total: page.totalElements,
+            page: page.number,
+            limit: page.size,
+            totalPages: page.totalPages,
+        };
     }
 
     /**
@@ -101,7 +162,32 @@ class ShopProviderService {
      */
     async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Get provider statistics for a specific period
+     */
+    async getProviderStatistics(
+        providerId: string,
+        periodStart?: string,
+        periodEnd?: string,
+    ): Promise<ApiResponse<ProviderStatistics>> {
+        const query = new URLSearchParams();
+        if (periodStart) query.append('periodStart', periodStart);
+        if (periodEnd) query.append('periodEnd', periodEnd);
+
+        const url = query.toString()
+            ? `${this.baseUrl}/${providerId}/statistics?${query.toString()}`
+            : `${this.baseUrl}/${providerId}/statistics`;
+
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -109,12 +195,18 @@ class ShopProviderService {
 
     /**
      * Get products for a specific provider with pagination
-     * Returns transformed PaginatedResponse
      */
-    async getProviderProducts(providerId: string, page: number = 0, size: number = 20): Promise<PaginatedResponse<ShopProduct>> {
+    async getProviderProducts(
+        providerId: string,
+        page: number = 0,
+        size: number = 20,
+    ): Promise<PaginatedResponse<ShopProduct>> {
         const response = await fetch(
             `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`,
-            { cache: 'no-store' }
+            {
+                cache: 'no-store',
+                headers: this.getAuthHeaders(),
+            },
         );
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -125,24 +217,30 @@ class ShopProviderService {
     /**
      * Create a new provider
      */
-    async createProvider(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ShopProvider>> {
+    async createProvider(provider: CreateProviderRequest): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(provider)
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
+            body: JSON.stringify(provider),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
 
     /**
-     * Update provider
+     * Update provider details
      */
-    async updateProvider(id: string, provider: Partial<ShopProvider>): Promise<ApiResponse<ShopProvider>> {
+    async updateProvider(id: string, provider: UpdateProviderRequest): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(provider)
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
+            body: JSON.stringify(provider),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -151,9 +249,80 @@ class ShopProviderService {
     /**
      * Toggle provider active status
      */
-    async toggleProviderStatus(id: string, isActive: boolean): Promise<ApiResponse<ShopProvider>> {
-        return this.updateProvider(id, { isActive });
+    async toggleProviderStatus(id: string): Promise<ApiResponse<ShopProvider>> {
+        const response = await fetch(`${this.baseUrl}/${id}/toggle-status`, {
+            method: 'PATCH',
+            headers: this.getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
     }
+
+    /**
+     * Update provider rating
+     */
+    async updateProviderRating(id: string, rating: number): Promise<ApiResponse<ShopProvider>> {
+        const response = await fetch(`${this.baseUrl}/${id}/rating?rating=${rating}`, {
+            method: 'PATCH',
+            headers: this.getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    /**
+     * Delete provider (soft or hard)
+     */
+    async deleteProvider(id: string, hardDelete: boolean = false): Promise<ApiResponse<unknown>> {
+        const response = await fetch(`${this.baseUrl}/${id}?hardDelete=${hardDelete}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+}
+
+interface ProviderListItem {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+    rating?: number | null;
+    isActive: boolean;
+}
+
+function mapProviderSearchResultToSummary(result: ProviderSearchResult): ProviderSummary {
+    return {
+        id: result.id,
+        name: result.name,
+        logoUrl: result.logoUrl,
+        rating: result.rating,
+        isActive: result.isActive,
+        productsCount: result.productsCount,
+        commissionPercentage: result.commissionPercentage,
+        averageProductPrice: null,
+        totalRevenue: null,
+        createdAt: null,
+        updatedAt: null,
+    };
+}
+
+function mapProviderListItemToSummary(result: ProviderListItem): ProviderSummary {
+    return {
+        id: result.id,
+        name: result.name,
+        logoUrl: result.logoUrl ?? null,
+        rating: result.rating ?? null,
+        isActive: result.isActive,
+        productsCount: null,
+        commissionPercentage: null,
+        averageProductPrice: null,
+        totalRevenue: null,
+        activeProductsCount: null,
+        categoriesCount: null,
+        createdAt: null,
+        updatedAt: null,
+    };
 }
 
 // ============================================================================

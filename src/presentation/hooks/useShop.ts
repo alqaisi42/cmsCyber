@@ -24,8 +24,10 @@ import {
     CreateVariantRequest,
     CreateImageRequest,
     ProductSearchParams,
-    ProviderStatsResponse,
+    ProviderSummary,
+    ProviderStatistics,
 } from '../../core/entities/ecommerce';
+import { CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest } from '@/core/types/provider.types';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 
 // =============================================================================
@@ -33,13 +35,21 @@ import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositori
 // =============================================================================
 
 export function useProviders() {
-    return useQuery<ProviderStatsResponse[], Error>({
+    return useQuery<ProviderSummary[], Error>({
         queryKey: ['providers'],
         queryFn: async () => {
             const response = await shopProviderService.getProviders();
             return response.data;
         },
         staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useSearchProviders(params: ProviderSearchRequest) {
+    return useQuery<PaginatedResponse<ProviderSummary>, Error>({
+        queryKey: ['providers', 'search', params],
+        queryFn: async () => shopProviderService.searchProviders(params),
+        staleTime: 2 * 60 * 1000,
     });
 }
 type ProviderQueryOptions<TData = ShopProvider> = Omit<
@@ -75,7 +85,7 @@ export function useProviderById(
 export function useProviderProducts(
     providerId: string,
     page: number = 0,
-    size: number = 20
+    size: number = 20,
 ) {
     return useQuery<PaginatedResponse<ShopProduct>, Error>({
         queryKey: ['providers-products', providerId, page, size],
@@ -87,12 +97,28 @@ export function useProviderProducts(
     });
 }
 
+export function useProviderStatistics(
+    providerId: string,
+    periodStart?: string,
+    periodEnd?: string,
+) {
+    return useQuery<ApiResponse<ProviderStatistics>, Error>({
+        queryKey: ['provider-statistics', providerId, periodStart, periodEnd],
+        queryFn: async () => {
+            const response = await shopProviderService.getProviderStatistics(providerId, periodStart, periodEnd);
+            return response;
+        },
+        enabled: !!providerId,
+        staleTime: 1 * 60 * 1000,
+    });
+}
+
 
 export function useCreateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>) => {
+        mutationFn: async (provider: CreateProviderRequest) => {
             const response = await shopProviderService.createProvider(provider);
             return response.data;
         },
@@ -106,7 +132,7 @@ export function useUpdateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<ShopProvider> }) => {
+        mutationFn: async ({ id, data }: { id: string; data: UpdateProviderRequest }) => {
             const response = await shopProviderService.updateProvider(id, data);
             return response.data;
         },
@@ -121,13 +147,43 @@ export function useToggleProviderStatus() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            const response = await shopProviderService.toggleProviderStatus(id, isActive);
+        mutationFn: async ({ id }: { id: string }) => {
+            const response = await shopProviderService.toggleProviderStatus(id);
             return response.data;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['providers'] });
             queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+        },
+    });
+}
+
+export function useUpdateProviderRating() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, rating }: { id: string; rating: number }) => {
+            const response = await shopProviderService.updateProviderRating(id, rating);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['providers'] });
+            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+        },
+    });
+}
+
+export function useDeleteProvider() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, hardDelete = false }: { id: string; hardDelete?: boolean }) => {
+            await shopProviderService.deleteProvider(id, hardDelete);
+            return id;
+        },
+        onSuccess: (id) => {
+            queryClient.invalidateQueries({ queryKey: ['providers'] });
+            queryClient.invalidateQueries({ queryKey: ['provider', id] });
         },
     });
 }
