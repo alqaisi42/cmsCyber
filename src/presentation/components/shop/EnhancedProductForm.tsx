@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { CreateProductRequest, CreateVariantRequest, CreateImageRequest } from '../../../core/entities/ecommerce';
 import { useCategories, useProviders, useCreateProduct } from '../../hooks/useShop';
-import {MultiImageUpload} from "@/presentation/components/shop/MultiImageUpload";
+import { MultiImageUpload } from './MultiImageUpload';
 
 // Validation Schema
 const optionalNumberField = z

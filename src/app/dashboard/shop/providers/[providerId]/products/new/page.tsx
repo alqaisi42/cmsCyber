@@ -7,16 +7,45 @@ import { useProviderById, useProviders } from '@/presentation/hooks/useShop';
 import { EnhancedProductForm } from '@/presentation/components/shop/EnhancedProductForm';
 // Fallback to original if enhanced not available
 // import { ProductForm } from '@/presentation/components/shop/ProductForm';
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 export default function CreateProviderProductPage() {
     const params = useParams();
     const router = useRouter();
     const providerId = params.providerId as string;
-    const [selectedProviderId, setSelectedProviderId] = useState(providerId);
 
-    const { data: provider, isLoading, error } = useProviderById(selectedProviderId);
+    // Check if the provider ID looks like a placeholder
+    const isPlaceholderProvider = !providerId ||
+        providerId === 'undefined' ||
+        providerId === '11111111-1111-1111-1111-111111111111' ||
+        providerId.includes('1111');
+
+    // Use state for selected provider, initialize with URL param if valid
+    const [selectedProviderId, setSelectedProviderId] = useState(
+        isPlaceholderProvider ? '' : providerId
+    );
+
+    // Only fetch provider if we have a valid ID
+    const { data: provider, isLoading, error } = useProviderById(
+        selectedProviderId || ''
+    );
     const { data: allProviders } = useProviders();
+
+    // Try to find provider from the providers list if the fetch fails
+    const providerFromList = React.useMemo(() => {
+        if (!selectedProviderId || !allProviders) return null;
+        return allProviders.find(p => p.id === selectedProviderId);
+    }, [selectedProviderId, allProviders]);
+
+    // Use provider from fetch or from list
+    const activeProvider = provider || providerFromList;
+
+    // Update selected provider when URL changes (browser navigation)
+    useEffect(() => {
+        if (!isPlaceholderProvider && providerId !== selectedProviderId) {
+            setSelectedProviderId(providerId);
+        }
+    }, [providerId, isPlaceholderProvider]);
 
     const handleSuccess = () => {
         router.push(`/dashboard/shop/providers/${selectedProviderId}/products`);
@@ -27,40 +56,42 @@ export default function CreateProviderProductPage() {
     };
 
     const handleProviderSelect = (newProviderId: string) => {
-        setSelectedProviderId(newProviderId);
-        // Update the URL to reflect the new provider
-        router.replace(`/dashboard/shop/providers/${newProviderId}/products/new`);
+        if (newProviderId && newProviderId !== '') {
+            setSelectedProviderId(newProviderId);
+            // Don't navigate, just let the component re-render with the new selection
+            // This avoids page reload issues
+        }
     };
 
-    // Check if the provider ID looks like a placeholder
-    const isPlaceholderProvider = providerId === '11111111-1111-1111-1111-111111111111' ||
-        providerId.includes('1111') ||
-        !providerId ||
-        providerId === 'undefined';
+    // Determine what to show based on state
+    const hasValidProvider = selectedProviderId && !isPlaceholderProvider;
+    const isLoadingProvider = hasValidProvider && isLoading && !providerFromList; // Don't show loading if we have provider from list
+    const needsProviderSelection = !hasValidProvider;
 
     return (
         <div className="min-h-screen bg-slate-50 p-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <button
-                    onClick={() => router.back()}
+                    onClick={() => router.push('/dashboard/shop/providers')}
                     className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    Back to products
+                    Back to providers
                 </button>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Create product</span>
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                {isLoading && !isPlaceholderProvider && (
+                {/* Show loading when fetching selected provider */}
+                {isLoadingProvider && (
                     <div className="flex items-center justify-center py-12 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mr-2" />
                         Loading provider details...
                     </div>
                 )}
 
-                {/* Show provider selection if no valid provider or error */}
-                {(error || isPlaceholderProvider) && allProviders && allProviders.length > 0 && (
+                {/* Show provider selection if needed */}
+                {needsProviderSelection && !isLoadingProvider && allProviders && allProviders.length > 0 && (
                     <div className="space-y-6">
                         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                             <div className="flex items-start gap-3">
@@ -68,9 +99,7 @@ export default function CreateProviderProductPage() {
                                 <div className="flex-1">
                                     <p className="font-semibold text-amber-900">Provider Selection Required</p>
                                     <p className="text-sm text-amber-700 mt-1">
-                                        {isPlaceholderProvider
-                                            ? 'Please select a valid provider to create a product.'
-                                            : 'The specified provider was not found. Please select a different provider.'}
+                                        Please select a provider to create a product.
                                     </p>
                                 </div>
                             </div>
@@ -93,55 +122,18 @@ export default function CreateProviderProductPage() {
                                 ))}
                             </select>
                         </div>
-
-                        {/* Show alternative navigation options */}
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <button
-                                onClick={() => router.push('/dashboard/shop/providers')}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Store className="w-4 h-4" />
-                                Go to Providers List
-                            </button>
-                            <button
-                                onClick={() => router.back()}
-                                className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                        </div>
                     </div>
                 )}
 
-                {/* Show error if no providers available */}
-                {(error || isPlaceholderProvider) && (!allProviders || allProviders.length === 0) && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                            <div className="flex-1">
-                                <p className="font-semibold text-red-900">No Providers Available</p>
-                                <p className="text-sm text-red-700 mt-1">
-                                    You need to create a provider before you can add products.
-                                </p>
-                                <button
-                                    onClick={() => router.push('/dashboard/shop/providers')}
-                                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                                >
-                                    Go to Providers
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Show form when provider is loaded successfully */}
-                {!isLoading && provider && !error && (
+                {/* Always show form if we have a selected provider ID, even if provider data isn't loaded yet */}
+                {selectedProviderId && !isPlaceholderProvider && !isLoadingProvider && (
                     <div className="space-y-8">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                                     <PackagePlus className="w-6 h-6 text-blue-600" />
-                                    Add a product for {provider.name}
+                                    Add a new product
+                                    {activeProvider && ` for ${activeProvider.name}`}
                                 </h1>
                                 <p className="text-sm text-slate-600 mt-2 max-w-2xl">
                                     Create rich product listings with variant management and 360° image support.
@@ -159,15 +151,18 @@ export default function CreateProviderProductPage() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-sm text-slate-500">Provider</p>
-                                <p className="font-semibold text-slate-900">{provider.name}</p>
-                                <p className="text-xs text-slate-500 mt-1">ID: {provider.id}</p>
-                            </div>
+                            {activeProvider && (
+                                <div className="text-right">
+                                    <p className="text-sm text-slate-500">Provider</p>
+                                    <p className="font-semibold text-slate-900">{activeProvider.name}</p>
+                                    <p className="text-xs text-slate-500 mt-1">ID: {selectedProviderId}</p>
+                                </div>
+                            )}
                         </div>
 
+                        {/* Always display the form with the selected provider ID */}
                         <EnhancedProductForm
-                            initialProviderId={provider.id}
+                            initialProviderId={selectedProviderId}
                             onCancel={handleCancel}
                             onSuccess={handleSuccess}
                         />
