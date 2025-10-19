@@ -91,23 +91,13 @@ class ShopProviderService {
      * Get all providers (active by default)
      */
     async getProviders(): Promise<ApiResponse<ProviderSummary[]>> {
-        const response = await fetch(`${this.baseUrl}/search`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query: '',
-                page: 0,
-                size: 100,
-                sortBy: 'NAME',
-                sortDirection: 'ASC',
-            }),
-        });
+        const response = await fetch(this.baseUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-        const apiResponse: ApiResponse<SpringBootPageResponse<ProviderSearchResult>> = await response.json();
+        const apiResponse: ApiResponse<ProviderListItem[]> = await response.json();
         return {
             success: apiResponse.success,
-            data: apiResponse.data.content.map(mapProviderSearchResultToSummary),
+            data: apiResponse.data.map(mapProviderListItemToSummary),
             message: apiResponse.message,
             errors: apiResponse.errors,
             timestamp: apiResponse.timestamp,
@@ -260,6 +250,14 @@ class ShopProviderService {
     }
 }
 
+interface ProviderListItem {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+    rating?: number | null;
+    isActive: boolean;
+}
+
 function mapProviderSearchResultToSummary(result: ProviderSearchResult): ProviderSummary {
     return {
         id: result.id,
@@ -271,6 +269,24 @@ function mapProviderSearchResultToSummary(result: ProviderSearchResult): Provide
         commissionPercentage: result.commissionPercentage,
         averageProductPrice: null,
         totalRevenue: null,
+        createdAt: null,
+        updatedAt: null,
+    };
+}
+
+function mapProviderListItemToSummary(result: ProviderListItem): ProviderSummary {
+    return {
+        id: result.id,
+        name: result.name,
+        logoUrl: result.logoUrl ?? null,
+        rating: result.rating ?? null,
+        isActive: result.isActive,
+        productsCount: null,
+        commissionPercentage: null,
+        averageProductPrice: null,
+        totalRevenue: null,
+        activeProductsCount: null,
+        categoriesCount: null,
         createdAt: null,
         updatedAt: null,
     };
