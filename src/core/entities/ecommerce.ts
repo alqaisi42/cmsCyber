@@ -8,30 +8,75 @@
 // SHOP PROVIDER
 // ============================================================================
 
-import {BaseEntity} from "./index";
+import { BaseEntity } from './index';
 
-export interface ShopProvider extends BaseEntity {
-    name: string;
-    description?: string;
-    contactEmail: string;
-    contactPhone?: string;
-    address?: string;
-    logoUrl?: string;
-    website?: string;
-    isActive: boolean;
-    rating: number;
+// ============================================================================
+// PROVIDER DOMAIN TYPES
+// ============================================================================
+
+export interface ProviderAddress {
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    latitude?: number | null;
+    longitude?: number | null;
 }
 
-export interface ProviderStatsResponse {
+export interface ProviderSummary {
     id: string;
     name: string;
     logoUrl?: string | null;
-    rating: number | null; // ✅ Explicitly nullable
+    rating: number | null;
     isActive: boolean;
-    totalProducts: number | null; // ✅ Explicitly nullable
-    productsInStock: number | null; // ✅ Explicitly nullable
-    averagePrice: number | null; // ✅ Explicitly nullable
-    createdAt: string;
+    productsCount: number | null;
+    commissionPercentage: number | null;
+    averageProductPrice?: number | null;
+    totalRevenue?: number | null;
+    activeProductsCount?: number | null;
+    categoriesCount?: number | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+}
+
+export interface ShopProvider extends BaseEntity {
+    name: string;
+    logoUrl?: string | null;
+    rating: number | null;
+    contactEmail: string;
+    contactPhone?: string | null;
+    website?: string | null;
+    description?: string | null;
+    businessRegistrationNumber?: string | null;
+    taxNumber?: string | null;
+    address: ProviderAddress;
+    commissionPercentage: number;
+    isActive: boolean;
+    activeProductsCount: number;
+    activeVariantsCount: number;
+    categoriesCount: number;
+    totalRevenue?: number | null;
+    averageProductPrice?: number | null;
+}
+
+export interface ProviderStatistics {
+    providerId: string;
+    totalProducts: number;
+    activeProducts: number;
+    outOfStockProducts: number;
+    lowStockProducts: number;
+    totalOrders: number;
+    pendingOrders: number;
+    completedOrders: number;
+    totalRevenue: number;
+    monthlyRevenue: number;
+    averageOrderValue: number;
+    customerRating: number;
+    totalReviews: number;
+    bestSellingProduct?: ShopProduct;
+    periodStart: string;
+    periodEnd: string;
 }
 
 // ============================================================================

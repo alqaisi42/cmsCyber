@@ -31,16 +31,11 @@ export default function EnhancedProvidersPage() {
     const stats = providers ? {
         total: providers.length,
         active: providers.filter(p => p.isActive).length,
-        totalProducts: providers.reduce((sum, p) => sum + (p.totalProducts ?? 0), 0),
+        totalProducts: providers.reduce((sum, p) => sum + (p.productsCount ?? 0), 0),
         avgRating: providers.length > 0
             ? (providers.reduce((sum, p) => sum + (p.rating ?? 0), 0) / providers.length).toFixed(1)
             : '0.0',
-        lowStock: providers.filter(p => {
-            const stockRate = p.totalProducts > 0
-                ? (p.productsInStock / p.totalProducts)
-                : 0;
-            return stockRate < 0.2;
-        }).length,
+        lowStock: providers.filter(p => (p.activeProductsCount ?? 0) < ((p.productsCount ?? 0) * 0.2)).length,
     } : null;
 
     const handleViewDetails = useCallback((id: string) => {
@@ -51,9 +46,9 @@ export default function EnhancedProvidersPage() {
         router.push(`/dashboard/shop/providers/${id}/edit`);
     }, [router]);
 
-    const handleToggleStatus = useCallback(async (id: string, isActive: boolean) => {
+    const handleToggleStatus = useCallback(async (id: string) => {
         try {
-            await toggleStatusMutation.mutateAsync({ id, isActive });
+            await toggleStatusMutation.mutateAsync({ id });
         } catch (error) {
             console.error('Failed to toggle provider status:', error);
         }

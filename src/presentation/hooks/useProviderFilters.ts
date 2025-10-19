@@ -2,9 +2,9 @@
 // File: src/presentation/hooks/useProviderFilters.ts
 import { useState, useMemo, useCallback } from 'react';
 import { ProviderFilters } from '@/core/types/provider.types';
-import { ProviderStatsResponse } from '@/core/entities/ecommerce';
+import { ProviderSummary } from '@/core/entities/ecommerce';
 
-export function useProviderFilters(providers: ProviderStatsResponse[] = []) {
+export function useProviderFilters(providers: ProviderSummary[] = []) {
     const [filters, setFilters] = useState<ProviderFilters>({
         search: '',
         status: 'all',
@@ -38,7 +38,7 @@ export function useProviderFilters(providers: ProviderStatsResponse[] = []) {
         // Products filter
         if (filters.minProducts) {
             result = result.filter(p =>
-                (p.totalProducts ?? 0) >= filters.minProducts!
+                (p.productsCount ?? 0) >= filters.minProducts!
             );
         }
 
@@ -54,11 +54,10 @@ export function useProviderFilters(providers: ProviderStatsResponse[] = []) {
                     comparison = (a.rating ?? 0) - (b.rating ?? 0);
                     break;
                 case 'products':
-                    comparison = (a.totalProducts ?? 0) - (b.totalProducts ?? 0);
+                    comparison = (a.productsCount ?? 0) - (b.productsCount ?? 0);
                     break;
                 case 'revenue':
-                    // This would need actual revenue data
-                    comparison = 0;
+                    comparison = (a.totalRevenue ?? 0) - (b.totalRevenue ?? 0);
                     break;
             }
 

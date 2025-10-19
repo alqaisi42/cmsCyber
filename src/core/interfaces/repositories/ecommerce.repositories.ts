@@ -9,9 +9,11 @@ import {
     CreateProductRequest,
     CreateVariantRequest,
     ProductSearchParams,
-    ProviderStatsResponse
+    ProviderSummary,
+    ProviderStatistics,
 } from '../../entities/ecommerce';
 import {PaginatedResponse, PaginationParams} from "../repositories";
+import { ProviderSearchRequest } from '@/core/types/provider.types';
 
 // Import from base repository (single source of truth)
 
@@ -21,15 +23,16 @@ import {PaginatedResponse, PaginationParams} from "../repositories";
 
 export interface IShopProviderRepository {
     // Basic CRUD
-    getAll(params: PaginationParams): Promise<PaginatedResponse<ProviderStatsResponse>>;
+    getAll(params: PaginationParams): Promise<PaginatedResponse<ProviderSummary>>;
     getById(id: string): Promise<ShopProvider>;
     create(provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>): Promise<ShopProvider>;
     update(id: string, provider: Partial<ShopProvider>): Promise<ShopProvider>;
     delete(id: string): Promise<void>;
 
     // Provider-specific operations
-    toggleStatus(id: string, isActive: boolean): Promise<ShopProvider>;
-    getProviderStats(id: string): Promise<ProviderStatsResponse>;
+    toggleStatus(id: string): Promise<ShopProvider>;
+    search(params: ProviderSearchRequest): Promise<PaginatedResponse<ProviderSummary>>;
+    getProviderStats(id: string): Promise<ProviderStatistics>;
     updateRating(id: string, rating: number): Promise<ShopProvider>;
 }
 

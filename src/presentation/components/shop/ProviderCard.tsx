@@ -1,19 +1,19 @@
 'use client';
 
 import { Store, Star, Package, DollarSign, TrendingUp } from 'lucide-react';
-import { ProviderStatsResponse } from '../../../core/entities/ecommerce';
+import { ProviderSummary } from '../../../core/entities/ecommerce';
 
 interface ProviderCardProps {
-    provider: ProviderStatsResponse;
+    provider: ProviderSummary;
     onViewProducts: (id: string) => void;
 }
 
 export function ProviderCard({ provider, onViewProducts }: ProviderCardProps) {
     // ✅ FIX: Safe handling of potentially null/undefined values
     const rating = provider.rating ?? 0;
-    const averagePrice = provider.averagePrice ?? 0;
-    const totalProducts = provider.totalProducts ?? 0;
-    const productsInStock = provider.productsInStock ?? 0;
+    const averagePrice = provider.averageProductPrice ?? 0;
+    const totalProducts = provider.productsCount ?? provider.activeProductsCount ?? 0;
+    const productsInStock = provider.activeProductsCount ?? provider.productsCount ?? 0;
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">

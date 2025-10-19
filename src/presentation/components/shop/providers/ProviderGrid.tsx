@@ -1,17 +1,17 @@
 // File: src/presentation/components/shop/providers/ProviderGrid.tsx
 import { ProviderCard } from './ProviderCard';
 import { ProviderCardSkeleton } from './ProviderCardSkeleton';
-import { ProviderStatsResponse } from '@/core/entities/ecommerce';
+import { ProviderSummary } from '@/core/entities/ecommerce';
 import { ProviderMetrics } from '@/core/types/provider.types';
 import { Store } from 'lucide-react';
 
 interface ProviderGridProps {
-    providers: ProviderStatsResponse[];
+    providers: ProviderSummary[];
     metrics?: Record<string, ProviderMetrics>;
     isLoading?: boolean;
     onViewDetails: (id: string) => void;
     onEdit?: (id: string) => void;
-    onToggleStatus?: (id: string, isActive: boolean) => void;
+    onToggleStatus?: (id: string) => void;
     variant?: 'default' | 'compact' | 'detailed';
     selectedIds?: string[];
     emptyMessage?: string;

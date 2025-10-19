@@ -17,3 +17,25 @@ export interface ProviderMetrics {
     returnRate: number;
     customerSatisfaction: number;
 }
+
+export interface ProviderSearchRequest {
+    query?: string;
+    isActive?: boolean;
+    minRating?: number;
+    maxCommission?: number;
+    hasProducts?: boolean;
+    sortBy?: 'NAME' | 'RATING' | 'COMMISSION' | 'PRODUCTS';
+    sortDirection?: 'ASC' | 'DESC';
+    page?: number;
+    size?: number;
+}
+
+export interface ProviderSearchResult {
+    id: string;
+    name: string;
+    logoUrl: string | null;
+    rating: number | null;
+    isActive: boolean;
+    productsCount: number;
+    commissionPercentage: number;
+}
