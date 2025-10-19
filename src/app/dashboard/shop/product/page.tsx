@@ -1,12 +1,50 @@
-
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Package, Search, Filter, SlidersHorizontal } from 'lucide-react';
+import { Package, Search } from 'lucide-react';
 import { useSearchProducts } from '../../../../presentation/hooks/useShop';
 import { ProductCard } from '../../../../presentation/components/shop/ProductCard';
-import { ProductSearchParams } from '../../../../core/entities/ecommerce';
+import { ShopProduct, ProductSearchParams } from '../../../../core/entities/ecommerce';
+
+function toProductCardModel(product: ShopProduct) {
+    const extractImageUrls = (images?: any): string[] => {
+        if (!images) return [];
+        if (Array.isArray(images)) return images.map(img => img?.url).filter(Boolean);
+        if (typeof images === 'object')
+            return Object.values(images)
+                .map((group: any) => group?.url)
+                .filter(Boolean);
+        return [];
+    };
+
+    return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        basePrice: product.basePrice,
+        totalStock: product.totalStock,
+        stockQuantity: product.totalStock,
+        imageUrl:
+            product.primaryImageUrl ||
+            product.primaryImageUrl ||
+            extractImageUrls(product.images)[0] ||
+            undefined,
+        images: extractImageUrls(product.images),
+
+        // ✅ FIX: convert array → count
+        totalVariants: Array.isArray(product.variants)
+            ? product.variants.length
+            : product.variants ?? 0,
+
+        brandName: product.brandName,
+        rating: product.rating,
+        discount: 0,
+        discountPercentage: product.discountPercentage,
+        isOnSale: product.isOnSale,
+    };
+}
+
 
 export default function AllProductsPage() {
     const router = useRouter();
@@ -14,19 +52,20 @@ export default function AllProductsPage() {
     const [searchParams, setSearchParams] = useState<ProductSearchParams>({
         page: 0,
         size: 20,
-        sortBy: 'newest'
+        sortBy: 'newest',
     });
 
     const [searchQuery, setSearchQuery] = useState('');
 
-    const { data: productsResponse, isLoading, error } = useSearchProducts(searchParams);
+    const { data: productsResponse, isLoading, error } =
+        useSearchProducts(searchParams);
 
     const handleSearch = () => {
-        setSearchParams(prev => ({ ...prev, keyword: searchQuery, page: 0 }));
+        setSearchParams((prev) => ({ ...prev, keyword: searchQuery, page: 0 }));
     };
 
     const handleSortChange = (sortBy: ProductSearchParams['sortBy']) => {
-        setSearchParams(prev => ({ ...prev, sortBy, page: 0 }));
+        setSearchParams((prev) => ({ ...prev, sortBy, page: 0 }));
     };
 
     if (isLoading) {
@@ -71,7 +110,9 @@ export default function AllProductsPage() {
 
                         <select
                             value={searchParams.sortBy}
-                            onChange={(e) => handleSortChange(e.target.value as ProductSearchParams['sortBy'])}
+                            onChange={(e) =>
+                                handleSortChange(e.target.value as ProductSearchParams['sortBy'])
+                            }
                             className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="newest">Newest First</option>
@@ -93,20 +134,28 @@ export default function AllProductsPage() {
             {productsResponse && productsResponse.data.length > 0 ? (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {productsResponse.data.map((product) => (
-                            <ProductCard
-                                key={product.id}
-                                product={product}
-                                onView={(id) => router.push(`/dashboard/shop/products/${id}`)}
-                            />
-                        ))}
+                        {productsResponse.data.map((product) => {
+                            const normalized = toProductCardModel(product);
+                            return (
+                                <ProductCard
+                                    key={product.id}
+                                    product={normalized}
+                                    onView={(id) => router.push(`/dashboard/shop/products/${id}`)}
+                                />
+                            );
+                        })}
                     </div>
 
                     {/* Pagination */}
                     {productsResponse.totalPages > 1 && (
                         <div className="mt-8 flex items-center justify-center gap-2">
                             <button
-                                onClick={() => setSearchParams(prev => ({ ...prev, page: Math.max(0, prev.page - 1) }))}
+                                onClick={() =>
+                                    setSearchParams((prev) => ({
+                                        ...prev,
+                                        page: Math.max(0, prev.page - 1),
+                                    }))
+                                }
                                 disabled={searchParams.page === 0}
                                 className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -116,7 +165,15 @@ export default function AllProductsPage() {
                 Page {searchParams.page + 1} of {productsResponse.totalPages}
               </span>
                             <button
-                                onClick={() => setSearchParams(prev => ({ ...prev, page: Math.min(productsResponse.totalPages - 1, prev.page + 1) }))}
+                                onClick={() =>
+                                    setSearchParams((prev) => ({
+                                        ...prev,
+                                        page: Math.min(
+                                            productsResponse.totalPages - 1,
+                                            prev.page + 1,
+                                        ),
+                                    }))
+                                }
                                 disabled={searchParams.page >= productsResponse.totalPages - 1}
                                 className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >

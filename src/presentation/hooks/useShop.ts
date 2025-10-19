@@ -27,8 +27,8 @@ import {
     ProviderSummary,
     ProviderStatistics,
 } from '../../core/entities/ecommerce';
-import { ProviderSearchRequest } from '@/core/types/provider.types';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
+import {ProviderSearchRequest} from "@/core/types/provider.types";
 
 // =============================================================================
 // PROVIDER HOOKS
