@@ -27,9 +27,8 @@ import {
     ProviderSummary,
     ProviderStatistics,
 } from '../../core/entities/ecommerce';
-import { CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest } from '@/core/types/provider.types';
-import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
-import {ProviderSearchRequest} from "@/core/types/provider.types";
+import {CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest} from '@/core/types/provider.types';
+import {ApiResponse, PaginatedResponse} from '../../core/interfaces/repositories';
 
 // =============================================================================
 // PROVIDER HOOKS
@@ -53,6 +52,7 @@ export function useSearchProviders(params: ProviderSearchRequest) {
         staleTime: 2 * 60 * 1000,
     });
 }
+
 type ProviderQueryOptions<TData = ShopProvider> = Omit<
     UseQueryOptions<TData, Error>,
     'queryKey' | 'queryFn'
@@ -124,7 +124,7 @@ export function useCreateProvider() {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
+            queryClient.invalidateQueries({queryKey: ['providers']});
         },
     });
 }
@@ -133,13 +133,13 @@ export function useUpdateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: UpdateProviderRequest }) => {
+        mutationFn: async ({id, data}: { id: string; data: UpdateProviderRequest }) => {
             const response = await shopProviderService.updateProvider(id, data);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+            queryClient.invalidateQueries({queryKey: ['providers']});
+            queryClient.invalidateQueries({queryKey: ['provider', data.id]});
         },
     });
 }
@@ -148,13 +148,13 @@ export function useToggleProviderStatus() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id }: { id: string }) => {
+        mutationFn: async ({id}: { id: string }) => {
             const response = await shopProviderService.toggleProviderStatus(id);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+            queryClient.invalidateQueries({queryKey: ['providers']});
+            queryClient.invalidateQueries({queryKey: ['provider', data.id]});
         },
     });
 }
@@ -163,13 +163,13 @@ export function useUpdateProviderRating() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, rating }: { id: string; rating: number }) => {
+        mutationFn: async ({id, rating}: { id: string; rating: number }) => {
             const response = await shopProviderService.updateProviderRating(id, rating);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-            queryClient.invalidateQueries({ queryKey: ['provider', data.id] });
+            queryClient.invalidateQueries({queryKey: ['providers']});
+            queryClient.invalidateQueries({queryKey: ['provider', data.id]});
         },
     });
 }
@@ -178,13 +178,13 @@ export function useDeleteProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, hardDelete = false }: { id: string; hardDelete?: boolean }) => {
+        mutationFn: async ({id, hardDelete = false}: { id: string; hardDelete?: boolean }) => {
             await shopProviderService.deleteProvider(id, hardDelete);
             return id;
         },
         onSuccess: (id) => {
-            queryClient.invalidateQueries({ queryKey: ['providers'] });
-            queryClient.invalidateQueries({ queryKey: ['provider', id] });
+            queryClient.invalidateQueries({queryKey: ['providers']});
+            queryClient.invalidateQueries({queryKey: ['provider', id]});
         },
     });
 }
@@ -234,8 +234,8 @@ export function useCreateProduct() {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['provider-products'] });
+            queryClient.invalidateQueries({queryKey: ['products']});
+            queryClient.invalidateQueries({queryKey: ['provider-products']});
         },
     });
 }
@@ -244,13 +244,13 @@ export function useUpdateProduct() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<ShopProduct> }) => {
+        mutationFn: async ({id, data}: { id: string; data: Partial<ShopProduct> }) => {
             const response = await shopProductService.updateProduct(id, data);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['product', data.id] });
+            queryClient.invalidateQueries({queryKey: ['products']});
+            queryClient.invalidateQueries({queryKey: ['product', data.id]});
         },
     });
 }
@@ -263,8 +263,8 @@ export function useDeleteProduct() {
             await shopProductService.deleteProduct(productId);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-            queryClient.invalidateQueries({ queryKey: ['provider-products'] });
+            queryClient.invalidateQueries({queryKey: ['products']});
+            queryClient.invalidateQueries({queryKey: ['provider-products']});
         },
     });
 }
@@ -295,13 +295,13 @@ export function useCreateVariant() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ productId, variant }: { productId: string; variant: CreateVariantRequest }) => {
+        mutationFn: async ({productId, variant}: { productId: string; variant: CreateVariantRequest }) => {
             const response = await productVariantService.createVariant(productId, variant);
             return response.data;
         },
         onSuccess: (data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants', variables.productId] });
-            queryClient.invalidateQueries({ queryKey: ['product', variables.productId] });
+            queryClient.invalidateQueries({queryKey: ['product-variants', variables.productId]});
+            queryClient.invalidateQueries({queryKey: ['product', variables.productId]});
         },
     });
 }
@@ -315,9 +315,9 @@ export function useCreateProductImage() {
 
     return useMutation({
         mutationFn: async ({
-            productId,
-            image,
-        }: {
+                               productId,
+                               image,
+                           }: {
             productId: string;
             image: CreateImageRequest;
         }) => {
@@ -325,7 +325,7 @@ export function useCreateProductImage() {
             return response.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['product-images', variables.productId] });
+            queryClient.invalidateQueries({queryKey: ['product-images', variables.productId]});
         },
     });
 }
@@ -335,10 +335,10 @@ export function useUploadProductImages() {
 
     return useMutation({
         mutationFn: async ({
-            productId,
-            files,
-            metadata,
-        }: {
+                               productId,
+                               files,
+                               metadata,
+                           }: {
             productId: string;
             files: File[];
             metadata?: UploadImageMetadata[];
@@ -347,7 +347,7 @@ export function useUploadProductImages() {
             return response.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['product-images', variables.productId] });
+            queryClient.invalidateQueries({queryKey: ['product-images', variables.productId]});
         },
     });
 }
@@ -359,13 +359,13 @@ export function useUpdateVariant() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ variantId, variant }: { variantId: string; variant: Partial<ProductVariant> }) => {
+        mutationFn: async ({variantId, variant}: { variantId: string; variant: Partial<ProductVariant> }) => {
             const response = await productVariantService.updateVariant(variantId, variant);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants', data.productId] });
-            queryClient.invalidateQueries({ queryKey: ['product', data.productId] });
+            queryClient.invalidateQueries({queryKey: ['product-variants', data.productId]});
+            queryClient.invalidateQueries({queryKey: ['product', data.productId]});
         },
     });
 }
@@ -377,13 +377,13 @@ export function useDeleteVariant() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ variantId, productId }: { variantId: string; productId: string }) => {
+        mutationFn: async ({variantId, productId}: { variantId: string; productId: string }) => {
             await productVariantService.deleteVariant(variantId);
             return productId;
         },
         onSuccess: (productId) => {
-            queryClient.invalidateQueries({ queryKey: ['product-variants', productId] });
-            queryClient.invalidateQueries({ queryKey: ['product', productId] });
+            queryClient.invalidateQueries({queryKey: ['product-variants', productId]});
+            queryClient.invalidateQueries({queryKey: ['product', productId]});
         },
     });
 }
@@ -424,7 +424,7 @@ export function useCreateCategory() {
             return response.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({queryKey: ['categories']});
         },
     });
 }
@@ -433,13 +433,13 @@ export function useUpdateCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<Category> }) => {
+        mutationFn: async ({id, data}: { id: string; data: Partial<Category> }) => {
             const response = await categoryService.updateCategory(id, data);
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-            queryClient.invalidateQueries({ queryKey: ['category', data.id] });
+            queryClient.invalidateQueries({queryKey: ['categories']});
+            queryClient.invalidateQueries({queryKey: ['category', data.id]});
         },
     });
 }
@@ -452,7 +452,7 @@ export function useDeleteCategory() {
             await categoryService.deleteCategory(categoryId);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({queryKey: ['categories']});
         },
     });
 }
