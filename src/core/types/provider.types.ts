@@ -1,4 +1,5 @@
 // File: src/core/types/provider.types.ts
+import { ProviderAddress } from '@/core/entities/ecommerce';
 export interface ProviderFilters {
     search: string;
     status: 'all' | 'active' | 'inactive';
@@ -38,4 +39,33 @@ export interface ProviderSearchResult {
     isActive: boolean;
     productsCount: number;
     commissionPercentage: number;
+}
+
+export interface CreateProviderRequest {
+    name: string;
+    logoUrl?: string;
+    contactEmail: string;
+    contactPhone?: string;
+    website?: string;
+    description?: string;
+    businessRegistrationNumber?: string;
+    taxNumber?: string;
+    address: ProviderAddress;
+    commissionPercentage: number;
+    isActive?: boolean;
+}
+
+export interface UpdateProviderRequest {
+    name?: string;
+    logoUrl?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    website?: string;
+    description?: string;
+    businessRegistrationNumber?: string;
+    taxNumber?: string;
+    address?: ProviderAddress;
+    commissionPercentage?: number;
+    isActive?: boolean;
+    rating?: number;
 }

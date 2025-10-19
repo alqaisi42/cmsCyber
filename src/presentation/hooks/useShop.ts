@@ -27,6 +27,7 @@ import {
     ProviderSummary,
     ProviderStatistics,
 } from '../../core/entities/ecommerce';
+import { CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest } from '@/core/types/provider.types';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 import {ProviderSearchRequest} from "@/core/types/provider.types";
 
@@ -118,7 +119,7 @@ export function useCreateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>) => {
+        mutationFn: async (provider: CreateProviderRequest) => {
             const response = await shopProviderService.createProvider(provider);
             return response.data;
         },
@@ -132,7 +133,7 @@ export function useUpdateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<ShopProvider> }) => {
+        mutationFn: async ({ id, data }: { id: string; data: UpdateProviderRequest }) => {
             const response = await shopProviderService.updateProvider(id, data);
             return response.data;
         },

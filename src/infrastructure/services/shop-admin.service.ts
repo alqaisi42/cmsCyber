@@ -16,7 +16,12 @@ import {
     ProviderStatistics,
 } from '../../core/entities/ecommerce';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
-import { ProviderSearchRequest, ProviderSearchResult } from '../../core/types/provider.types';
+import {
+    ProviderSearchRequest,
+    ProviderSearchResult,
+    CreateProviderRequest,
+    UpdateProviderRequest,
+} from '../../core/types/provider.types';
 
 // ============================================================================
 // SPRING BOOT RESPONSE TYPES
@@ -87,11 +92,22 @@ function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<
 class ShopProviderService {
     private readonly baseUrl = '/api/v1/providers';
 
+    private getAuthHeaders(): Record<string, string> {
+        if (typeof window === 'undefined') {
+            return {};
+        }
+        const token = localStorage.getItem('auth_token');
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    }
+
     /**
      * Get all providers (active by default)
      */
     async getProviders(): Promise<ApiResponse<ProviderSummary[]>> {
-        const response = await fetch(this.baseUrl, { cache: 'no-store' });
+        const response = await fetch(this.baseUrl, {
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const apiResponse: ApiResponse<ProviderListItem[]> = await response.json();
@@ -110,7 +126,10 @@ class ShopProviderService {
     async searchProviders(params: ProviderSearchRequest): Promise<PaginatedResponse<ProviderSummary>> {
         const response = await fetch(`${this.baseUrl}/search`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
             body: JSON.stringify({
                 query: params.query ?? '',
                 isActive: params.isActive,
@@ -144,6 +163,7 @@ class ShopProviderService {
     async getProviderById(id: string): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             cache: 'no-store',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -165,7 +185,10 @@ class ShopProviderService {
             ? `${this.baseUrl}/${providerId}/statistics?${query.toString()}`
             : `${this.baseUrl}/${providerId}/statistics`;
 
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }
@@ -180,7 +203,10 @@ class ShopProviderService {
     ): Promise<PaginatedResponse<ShopProduct>> {
         const response = await fetch(
             `${this.baseUrl}/${providerId}/products?page=${page}&size=${size}`,
-            { cache: 'no-store' },
+            {
+                cache: 'no-store',
+                headers: this.getAuthHeaders(),
+            },
         );
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -191,12 +217,13 @@ class ShopProviderService {
     /**
      * Create a new provider
      */
-    async createProvider(
-        provider: Omit<ShopProvider, 'id' | 'createdAt' | 'updatedAt'>,
-    ): Promise<ApiResponse<ShopProvider>> {
+    async createProvider(provider: CreateProviderRequest): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
             body: JSON.stringify(provider),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -206,10 +233,13 @@ class ShopProviderService {
     /**
      * Update provider details
      */
-    async updateProvider(id: string, provider: Partial<ShopProvider>): Promise<ApiResponse<ShopProvider>> {
+    async updateProvider(id: string, provider: UpdateProviderRequest): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...this.getAuthHeaders(),
+            },
             body: JSON.stringify(provider),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -222,6 +252,7 @@ class ShopProviderService {
     async toggleProviderStatus(id: string): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}/toggle-status`, {
             method: 'PATCH',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -233,6 +264,7 @@ class ShopProviderService {
     async updateProviderRating(id: string, rating: number): Promise<ApiResponse<ShopProvider>> {
         const response = await fetch(`${this.baseUrl}/${id}/rating?rating=${rating}`, {
             method: 'PATCH',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -244,6 +276,7 @@ class ShopProviderService {
     async deleteProvider(id: string, hardDelete: boolean = false): Promise<ApiResponse<unknown>> {
         const response = await fetch(`${this.baseUrl}/${id}?hardDelete=${hardDelete}`, {
             method: 'DELETE',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();

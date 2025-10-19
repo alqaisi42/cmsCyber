@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
+// Providers Search API Route
 // File: src/app/api/v1/providers/search/route.ts
-// Handles GET /api/v1/providers/search → forwards to backend
 // -----------------------------------------------------------------------------
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,14 +24,14 @@ function createHeaders(request: NextRequest): HeadersInit {
 async function forwardResponse(response: Response) {
     if (!response.ok) {
         const errorText = await response.text().catch(() => '');
-        console.error('Provider Search API Error:', errorText);
+        console.error('Provider search API error:', errorText);
         return NextResponse.json(
             {
                 success: false,
-                message: 'Provider search failed',
+                message: 'Provider search request failed',
                 error: errorText || undefined,
             },
-            { status: response.status }
+            { status: response.status },
         );
     }
 
@@ -39,24 +39,22 @@ async function forwardResponse(response: Response) {
     return NextResponse.json(data, { status: response.status });
 }
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
     try {
-        // Forward query params (page, size, keyword, etc.)
-        const url = new URL(request.url);
-        const query = url.searchParams.toString();
-
-        const response = await fetch(`${BACKEND_URL}/api/v1/providers/search?${query}`, {
-            method: 'GET',
+        const payload = await request.json();
+        const response = await fetch(`${BACKEND_URL}/api/v1/providers/search`, {
+            method: 'POST',
             headers: createHeaders(request),
+            body: JSON.stringify(payload),
             cache: 'no-store',
         });
 
         return await forwardResponse(response);
     } catch (error) {
-        console.error('Provider Search Proxy Error:', error);
+        console.error('Provider search API unexpected error:', error);
         return NextResponse.json(
             { success: false, message: 'Internal server error' },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }
