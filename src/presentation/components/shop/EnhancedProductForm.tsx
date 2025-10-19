@@ -4,14 +4,14 @@
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Trash2, Image as ImageIcon, Package, DollarSign,
     Tag, Box, Palette, Ruler, RotateCw, Save, X
 } from 'lucide-react';
 import { CreateProductRequest, CreateVariantRequest, CreateImageRequest } from '../../../core/entities/ecommerce';
 import { useCategories, useProviders, useCreateProduct } from '../../hooks/useShop';
-import { MultiImageUpload } from './MultiImageUpload';
+import { EnhancedImageUpload, ImageData } from './EnhancedImageUpload';
 
 // Validation Schema
 const optionalNumberField = z
@@ -68,7 +68,8 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
     const { data: providers } = useProviders();
     const createProduct = useCreateProduct();
     const [selected360Variant, setSelected360Variant] = useState<string>('');
-    const [bulk360Images, setBulk360Images] = useState<any[]>([]);
+    const [regularImages, setRegularImages] = useState<ImageData[]>([]);
+    const [rotation360Images, setRotation360Images] = useState<ImageData[]>([]);
 
     const {
         register,
@@ -107,13 +108,9 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
         name: 'variants'
     });
 
-    const { fields: imageFields, append: appendImage, remove: removeImage, replace: replaceImages } = useFieldArray({
-        control,
-        name: 'images'
-    });
-
     const is360Enabled = watch('is360Enabled');
     const variants = watch('variants');
+    const formImages = watch('images');
 
     // Get unique colors from variants for 360 association
     const variantColors = useMemo(() => {
@@ -121,37 +118,40 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
         return Array.from(colors);
     }, [variants]);
 
-    // Handle bulk 360 images change
-    const handleBulk360ImagesChange = (images: any[]) => {
-        setBulk360Images(images);
+    // Update form images when regular or 360 images change
+    useEffect(() => {
+        const allImages = [
+            ...regularImages.map((img): z.infer<typeof imageSchema> => ({
+                imageUrl: img.url,
+                imageType: img.imageType as 'regular' | 'thumbnail',
+                sequenceOrder: img.sequenceOrder,
+                isPrimary: img.isPrimary,
+                associatedColor: img.associatedColor || '',
+                variantId: img.variantId || '',
+                rotationFrameNumber: undefined
+            })),
+            ...rotation360Images.map((img): z.infer<typeof imageSchema> => ({
+                imageUrl: img.url,
+                imageType: 'rotation360' as const,
+                sequenceOrder: regularImages.length + img.sequenceOrder,
+                isPrimary: img.isPrimary && regularImages.length === 0,
+                associatedColor: img.associatedColor || selected360Variant || '',
+                variantId: img.variantId || '',
+                rotationFrameNumber: img.rotationFrameNumber
+            }))
+        ];
 
-        // Update form images array
-        const formattedImages = images.map((img, index) => ({
-            imageUrl: img.url,
-            imageType: 'rotation360' as const,
-            sequenceOrder: index,
-            isPrimary: img.isPrimary,
-            associatedColor: img.associatedColor || selected360Variant,
-            variantId: img.variantId,
-            rotationFrameNumber: index,
-        }));
+        setValue('images', allImages);
+    }, [regularImages, rotation360Images, selected360Variant, setValue]);
 
-        // Merge with existing non-360 images
-        const existing360 = imageFields.filter(img => img.imageType !== 'rotation360' && img.imageType !== '360');
-        replaceImages([...existing360, ...formattedImages]);
+    // Handle regular images change
+    const handleRegularImagesChange = (images: ImageData[]) => {
+        setRegularImages(images);
     };
 
-    // Add regular image
-    const addRegularImage = () => {
-        appendImage({
-            imageUrl: '',
-            imageType: 'regular',
-            sequenceOrder: imageFields.length,
-            isPrimary: imageFields.length === 0,
-            associatedColor: '',
-            variantId: '',
-            rotationFrameNumber: undefined
-        });
+    // Handle 360 images change
+    const handle360ImagesChange = (images: ImageData[]) => {
+        setRotation360Images(images);
     };
 
     const onSubmit = async (data: ProductFormData) => {
@@ -447,16 +447,32 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
 
             {/* Images Section */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                     <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                         <ImageIcon className="w-5 h-5" />
                         Product Images
                     </h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                        Upload and arrange your product images. Drag to reorder.
+                    </p>
+                </div>
+
+                {/* Regular Images */}
+                <div className="mb-6">
+                    <EnhancedImageUpload
+                        onImagesChange={handleRegularImagesChange}
+                        initialImages={regularImages}
+                        imageType="regular"
+                        maxFiles={20}
+                        maxFileSize={5}
+                        allowUrlInput={true}
+                        allowCaptions={true}
+                    />
                 </div>
 
                 {/* 360° Images Section - Only show if enabled */}
                 {is360Enabled && (
-                    <div className="mb-6">
+                    <div className="pt-6 border-t border-slate-200">
                         {variantColors.length > 0 && (
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -477,99 +493,23 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
                             </div>
                         )}
 
-                        <MultiImageUpload
-                            onImagesChange={handleBulk360ImagesChange}
+                        <EnhancedImageUpload
+                            onImagesChange={handle360ImagesChange}
+                            initialImages={rotation360Images}
+                            imageType="rotation360"
                             associatedColor={selected360Variant}
-                            maxFiles={50}
+                            maxFiles={100}
                             maxFileSize={5}
+                            allowUrlInput={true}
+                            allowCaptions={false}
                         />
                     </div>
                 )}
 
-                {/* Regular Images */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-semibold text-slate-700">Regular Images</h4>
-                        <button
-                            type="button"
-                            onClick={addRegularImage}
-                            className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Add Image
-                        </button>
-                    </div>
-
-                    {imageFields.filter(img => img.imageType === 'regular' || img.imageType === 'thumbnail').map((field, index) => {
-                        const actualIndex = imageFields.findIndex(f => f.id === field.id);
-                        return (
-                            <div key={field.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                <div className="flex items-start justify-between mb-3">
-                                    <h5 className="text-sm font-medium text-slate-700">
-                                        Image {index + 1}
-                                    </h5>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeImage(actualIndex)}
-                                        className="text-red-600 hover:text-red-700"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">
-                                            Image URL *
-                                        </label>
-                                        <input
-                                            {...register(`images.${actualIndex}.imageUrl`)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                            placeholder="https://example.com/image.jpg"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">
-                                            Image Type
-                                        </label>
-                                        <select
-                                            {...register(`images.${actualIndex}.imageType`)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                        >
-                                            <option value="regular">Regular</option>
-                                            <option value="thumbnail">Thumbnail</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-700 mb-1">
-                                            Associated Color
-                                        </label>
-                                        <input
-                                            {...register(`images.${actualIndex}.associatedColor`)}
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                            placeholder="Optional"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                {...register(`images.${actualIndex}.isPrimary`)}
-                                                className="w-4 h-4 text-blue-600 border-slate-300 rounded"
-                                            />
-                                            <span className="text-xs font-medium text-slate-700">
-                                                Primary Image
-                                            </span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                {/* Display validation error for images */}
+                {errors.images && (
+                    <p className="text-red-600 text-sm mt-2">{errors.images.message}</p>
+                )}
             </div>
 
             {/* Form Actions */}
@@ -583,10 +523,11 @@ export function EnhancedProductForm({ onSuccess, onCancel, initialProviderId }: 
                 </button>
                 <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    disabled={createProduct.isPending }
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Save className="w-4 h-4" />
-                    Create Product
+                    {createProduct.isPending  ? 'Creating...' : 'Create Product'}
                 </button>
             </div>
         </form>

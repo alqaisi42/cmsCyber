@@ -3,7 +3,7 @@
 // UPDATED - Added missing hooks for variants
 // =============================================================================
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {useQuery, useMutation, useQueryClient, UseQueryOptions} from '@tanstack/react-query';
 import {
     shopProviderService,
     shopProductService,
@@ -42,16 +42,33 @@ export function useProviders() {
         staleTime: 5 * 60 * 1000,
     });
 }
+type ProviderQueryOptions<TData = ShopProvider> = Omit<
+    UseQueryOptions<TData, Error>,
+    'queryKey' | 'queryFn'
+>;
 
-export function useProviderById(providerId: string) {
+export function useProviderById(
+    providerId: string,
+    options?: ProviderQueryOptions
+) {
     return useQuery<ShopProvider, Error>({
         queryKey: ['provider', providerId],
         queryFn: async () => {
+            if (!providerId) {
+                throw new Error('Provider ID is required');
+            }
             const response = await shopProviderService.getProviderById(providerId);
             return response.data;
         },
-        enabled: !!providerId,
-        staleTime: 5 * 60 * 1000,
+        enabled: !!providerId && (options?.enabled !== false),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        refetchOnWindowFocus: false,
+        retry: (failureCount, error) => {
+            // Don't retry on 404 errors
+            if (error?.message?.includes('404')) return false;
+            return failureCount < 3;
+        },
+        ...options, // Spread any additional options
     });
 }
 
