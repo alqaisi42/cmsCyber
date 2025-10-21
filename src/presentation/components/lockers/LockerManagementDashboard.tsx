@@ -1021,11 +1021,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                     </div>
                                                     {calendar ? (
                                                         <div className="space-y-2">
-                                                            {calendar.timeSlots.slice(0, 3).map((slot) => (
+                                                            {(calendar.timeSlots ?? []).slice(0, 3).map((slot) => (
                                                                 <div key={slot.startTime} className="text-xs text-gray-600">
                                                                     <p className="font-semibold text-gray-800">{new Date(slot.startTime).toLocaleString()} - {new Date(slot.endTime).toLocaleTimeString()}</p>
                                                                     <p className="text-gray-500">Status: {slot.status}</p>
-                                                                    {slot.reservations.map((reservation) => (
+                                                                    {(slot.reservations ?? []).map((reservation) => (
                                                                         <p key={reservation.reservationId} className="text-gray-400">• {reservation.userName} ({reservation.reservationType})</p>
                                                                     ))}
                                                                 </div>
