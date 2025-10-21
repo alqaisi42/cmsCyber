@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
     AccessibleSubscription,
     CreateSubscriptionRequest,
@@ -19,9 +19,9 @@ import {
     LockerReservationRequest,
     LockerSummary,
 } from '../../../core/entities/lockers';
-import { useAuthStore } from '../../contexts/auth-store';
-import { lockerSubscriptionService } from '../../../infrastructure/services/locker-subscription.service';
-import { lockerManagementService } from '../../../infrastructure/services/locker-management.service';
+import {useAuthStore} from '../../contexts/auth-store';
+import {lockerSubscriptionService} from '../../../infrastructure/services/locker-subscription.service';
+import {lockerManagementService} from '../../../infrastructure/services/locker-management.service';
 import {
     ArrowUpRight,
     CalendarCheck,
@@ -39,14 +39,14 @@ import {
     X,
     Info,
 } from 'lucide-react';
-import { cn } from '../../../shared/utils/cn';
+import {cn} from '../../../shared/utils/cn';
 
 const tabs = [
-    { id: 'overview', label: 'Overview', icon: Layers },
-    { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
-    { id: 'subscriptions', label: 'Subscriptions', icon: Users },
-    { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
-    { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+    {id: 'overview', label: 'Overview', icon: Layers},
+    {id: 'plans', label: 'Subscription Plans', icon: CreditCard},
+    {id: 'subscriptions', label: 'Subscriptions', icon: Users},
+    {id: 'lockers', label: 'Lockers & Availability', icon: Lock},
+    {id: 'reservations', label: 'Reservations', icon: CalendarCheck},
 ] as const;
 
 type TabKey = (typeof tabs)[number]['id'];
@@ -88,8 +88,8 @@ const INITIAL_RESERVATION_FORM: LockerReservationRequest = {
     notes: '',
 };
 
-export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerManagementDashboardProps) {
-    const { user, token } = useAuthStore();
+export function LockerManagementDashboard({defaultTab = 'overview'}: LockerManagementDashboardProps) {
+    const {user, token} = useAuthStore();
     const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
 
     const [plans, setPlans] = useState<LockerSubscriptionPlan[]>([]);
@@ -112,21 +112,25 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
     const [availabilityForm, setAvailabilityForm] = useState<LockerAvailabilityRequest>(INITIAL_AVAILABILITY_FORM);
     const [availabilityResult, setAvailabilityResult] = useState<LockerAvailabilityResult | null>(null);
-    const [availabilityState, setAvailabilityState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [availabilityState, setAvailabilityState] = useState<ActionState>({
+        loading: false,
+        message: null,
+        error: null
+    });
 
     const [reservationForm, setReservationForm] = useState<LockerReservationRequest>(INITIAL_RESERVATION_FORM);
-    const [reservationState, setReservationState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [reservationState, setReservationState] = useState<ActionState>({loading: false, message: null, error: null});
 
     const [createSubscriptionForm, setCreateSubscriptionForm] = useState<CreateSubscriptionRequest>(INITIAL_SUBSCRIPTION_FORM);
     const [createFormOpen, setCreateFormOpen] = useState(false);
-    const [createState, setCreateState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [createState, setCreateState] = useState<ActionState>({loading: false, message: null, error: null});
 
     const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
     const [upgradePlanId, setUpgradePlanId] = useState<string>('');
-    const [upgradeState, setUpgradeState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [upgradeState, setUpgradeState] = useState<ActionState>({loading: false, message: null, error: null});
 
-    const [sharingForm, setSharingForm] = useState<ShareSubscriptionRequest>({ permissions: ['VIEW', 'BOOK'] });
-    const [sharingState, setSharingState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [sharingForm, setSharingForm] = useState<ShareSubscriptionRequest>({permissions: ['VIEW', 'BOOK']});
+    const [sharingState, setSharingState] = useState<ActionState>({loading: false, message: null, error: null});
 
     const [selectedUserId, setSelectedUserId] = useState<number>(() => {
         if (user?.id) {
@@ -145,8 +149,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [defaultTab]);
 
     useEffect(() => {
-        setAvailabilityForm((prev) => ({ ...prev, userId: selectedUserId }));
-        setReservationForm((prev) => ({ ...prev, userId: selectedUserId }));
+        setAvailabilityForm((prev) => ({...prev, userId: selectedUserId}));
+        setReservationForm((prev) => ({...prev, userId: selectedUserId}));
     }, [selectedUserId]);
 
     useEffect(() => {
@@ -293,51 +297,74 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [subscriptions, accessibleSubscriptions, reservations, locations]);
 
     const resetCreateForm = () => {
-        setCreateSubscriptionForm({ ...INITIAL_SUBSCRIPTION_FORM, planId: plans[0]?.id || '', locationId: locations[0]?.id || '' });
+        setCreateSubscriptionForm({
+            ...INITIAL_SUBSCRIPTION_FORM,
+            planId: plans[0]?.id || '',
+            locationId: locations[0]?.id || ''
+        });
         setCreateFormOpen(false);
     };
 
     const handleCreateSubscription = async () => {
         if (!token) {
-            setCreateState({ loading: false, message: null, error: 'Authentication token required to create subscriptions.' });
+            setCreateState({
+                loading: false,
+                message: null,
+                error: 'Authentication token required to create subscriptions.'
+            });
             return;
         }
 
         if (!createSubscriptionForm.planId || !createSubscriptionForm.locationId) {
-            setCreateState({ loading: false, message: null, error: 'Please select a plan and location.' });
+            setCreateState({loading: false, message: null, error: 'Please select a plan and location.'});
             return;
         }
 
-        setCreateState({ loading: true, message: null, error: null });
+        setCreateState({loading: true, message: null, error: null});
         try {
             await lockerSubscriptionService.createSubscription(createSubscriptionForm, token);
-            setCreateState({ loading: false, message: 'Subscription created successfully.', error: null });
+            setCreateState({loading: false, message: 'Subscription created successfully.', error: null});
             const response = await lockerSubscriptionService.getMySubscriptions(token);
             setSubscriptions(response.data);
             resetCreateForm();
         } catch (error) {
-            setCreateState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to create subscription.' });
+            setCreateState({
+                loading: false,
+                message: null,
+                error: error instanceof Error ? error.message : 'Failed to create subscription.'
+            });
         }
     };
 
     const handleUpgradeSubscription = async (subscriptionId: string) => {
         if (!token) {
-            setUpgradeState({ loading: false, message: null, error: 'Authentication token required to upgrade subscriptions.' });
+            setUpgradeState({
+                loading: false,
+                message: null,
+                error: 'Authentication token required to upgrade subscriptions.'
+            });
             return;
         }
         if (!upgradePlanId) {
-            setUpgradeState({ loading: false, message: null, error: 'Select the new plan to upgrade to.' });
+            setUpgradeState({loading: false, message: null, error: 'Select the new plan to upgrade to.'});
             return;
         }
-        setUpgradeState({ loading: true, message: null, error: null });
+        setUpgradeState({loading: true, message: null, error: null});
         try {
-            await lockerSubscriptionService.upgradeSubscription(subscriptionId, { newPlanId: upgradePlanId, effectiveImmediately: true }, token);
-            setUpgradeState({ loading: false, message: 'Subscription upgraded successfully.', error: null });
+            await lockerSubscriptionService.upgradeSubscription(subscriptionId, {
+                newPlanId: upgradePlanId,
+                effectiveImmediately: true
+            }, token);
+            setUpgradeState({loading: false, message: 'Subscription upgraded successfully.', error: null});
             const response = await lockerSubscriptionService.getMySubscriptions(token);
             setSubscriptions(response.data);
             setUpgradePlanId('');
         } catch (error) {
-            setUpgradeState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to upgrade subscription.' });
+            setUpgradeState({
+                loading: false,
+                message: null,
+                error: error instanceof Error ? error.message : 'Failed to upgrade subscription.'
+            });
         }
     };
 
@@ -361,55 +388,79 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
     const handleShareSubscription = async (subscriptionId: string) => {
         if (!token) {
-            setSharingState({ loading: false, message: null, error: 'Authentication token required to share subscriptions.' });
+            setSharingState({
+                loading: false,
+                message: null,
+                error: 'Authentication token required to share subscriptions.'
+            });
             return;
         }
         if (!sharingForm.sharedWithUserId && !sharingForm.sharedWithEmail) {
-            setSharingState({ loading: false, message: null, error: 'Provide a user ID or email to share with.' });
+            setSharingState({loading: false, message: null, error: 'Provide a user ID or email to share with.'});
             return;
         }
 
-        setSharingState({ loading: true, message: null, error: null });
+        setSharingState({loading: true, message: null, error: null});
         try {
             await lockerSubscriptionService.shareSubscription(subscriptionId, sharingForm, token);
-            setSharingState({ loading: false, message: 'Invitation sent successfully.', error: null });
-            setSharingForm({ permissions: ['VIEW', 'BOOK'] });
+            setSharingState({loading: false, message: 'Invitation sent successfully.', error: null});
+            setSharingForm({permissions: ['VIEW', 'BOOK']});
         } catch (error) {
-            setSharingState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to share subscription.' });
+            setSharingState({
+                loading: false,
+                message: null,
+                error: error instanceof Error ? error.message : 'Failed to share subscription.'
+            });
         }
     };
 
     const handleCheckAvailability = async () => {
         if (!availabilityForm.userId || !availabilityForm.locationId || !availabilityForm.requestedFrom || !availabilityForm.requestedUntil) {
-            setAvailabilityState({ loading: false, message: null, error: 'Complete all fields to check availability.' });
+            setAvailabilityState({loading: false, message: null, error: 'Complete all fields to check availability.'});
             return;
         }
-        setAvailabilityState({ loading: true, message: null, error: null });
+        setAvailabilityState({loading: true, message: null, error: null});
         try {
             const response = await lockerManagementService.checkLockerAvailability(availabilityForm, token);
             setAvailabilityResult(response.data);
-            setAvailabilityState({ loading: false, message: response.message, error: null });
+            setAvailabilityState({loading: false, message: response.message, error: null});
         } catch (error) {
             setAvailabilityResult(null);
-            setAvailabilityState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to check availability.' });
+            setAvailabilityState({
+                loading: false,
+                message: null,
+                error: error instanceof Error ? error.message : 'Failed to check availability.'
+            });
         }
     };
 
     const handleReserveLocker = async () => {
         if (!reservationForm.userId || !reservationForm.lockerId || !reservationForm.locationId || !reservationForm.reservedFrom || !reservationForm.reservedUntil) {
-            setReservationState({ loading: false, message: null, error: 'Complete all required fields to reserve a locker.' });
+            setReservationState({
+                loading: false,
+                message: null,
+                error: 'Complete all required fields to reserve a locker.'
+            });
             return;
         }
-        setReservationState({ loading: true, message: null, error: null });
+        setReservationState({loading: true, message: null, error: null});
         try {
             const response = await lockerManagementService.reserveLocker(reservationForm, token);
-            setReservationState({ loading: false, message: response.message || 'Locker reserved successfully.', error: null });
+            setReservationState({
+                loading: false,
+                message: response.message || 'Locker reserved successfully.',
+                error: null
+            });
             if (selectedUserId) {
                 const reservationsResponse = await lockerManagementService.getReservationsForUser(selectedUserId, reservationStatusFilter, token);
                 setReservations(reservationsResponse.data);
             }
         } catch (error) {
-            setReservationState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to reserve locker.' });
+            setReservationState({
+                loading: false,
+                message: null,
+                error: error instanceof Error ? error.message : 'Failed to reserve locker.'
+            });
         }
     };
 
@@ -443,7 +494,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         if (usageDetails[subscriptionId] || !token) return;
         try {
             const response = await lockerSubscriptionService.getUsage(subscriptionId, token);
-            setUsageDetails((prev) => ({ ...prev, [subscriptionId]: response.data }));
+            setUsageDetails((prev) => ({...prev, [subscriptionId]: response.data}));
         } catch (error) {
             console.error('Failed to load usage stats:', error);
         }
@@ -463,7 +514,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 endDate.toISOString(),
                 token
             );
-            setCalendarDetails((prev) => ({ ...prev, [subscriptionId]: response.data }));
+            setCalendarDetails((prev) => ({...prev, [subscriptionId]: response.data}));
         } catch (error) {
             console.error('Failed to load family calendar:', error);
         } finally {
@@ -485,7 +536,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
                         )}
                     >
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-4 h-4"/>
                         {tab.label}
                     </button>
                 );
@@ -507,7 +558,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                     <p className="text-xs text-gray-400 mt-2">{metric.description}</p>
                                 </div>
                                 <span className={cn('p-3 rounded-full', metric.color)}>
-                                    <Icon className="w-5 h-5" />
+                                    <Icon className="w-5 h-5"/>
                                 </span>
                             </div>
                         </div>
@@ -527,7 +578,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             onClick={() => setActiveTab('subscriptions')}
                         >
                             Manage
-                            <ArrowUpRight className="w-4 h-4" />
+                            <ArrowUpRight className="w-4 h-4"/>
                         </button>
                     </div>
                     <div className="space-y-3">
@@ -538,7 +589,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         <p className="font-semibold text-gray-900">{subscription.planName}</p>
                                         <p className="text-sm text-gray-500">{subscription.locationName}</p>
                                     </div>
-                                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                    <span
+                                        className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
                                         {subscription.status}
                                     </span>
                                 </div>
@@ -549,7 +601,9 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                     </div>
                                     <div>
                                         <p className="text-gray-400">Lockers</p>
-                                        <p className="font-semibold text-gray-700">{subscription.assignedLockers.length}/{subscription.features.maxLockers}</p>
+                                        <p className="font-semibold text-gray-700">
+                                            {subscription.assignedLockers.length}/{subscription.features?.maxLockers ?? 0}
+                                        </p>
                                     </div>
                                     <div>
                                         <p className="text-gray-400">Next billing</p>
@@ -559,7 +613,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             </div>
                         ))}
                         {!subscriptions.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                            <div
+                                className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
                                 No subscriptions yet. Create one to start assigning lockers.
                             </div>
                         )}
@@ -577,7 +632,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             onClick={() => setActiveTab('lockers')}
                         >
                             Explore
-                            <ArrowUpRight className="w-4 h-4" />
+                            <ArrowUpRight className="w-4 h-4"/>
                         </button>
                     </div>
                     <div className="space-y-3">
@@ -596,7 +651,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             </div>
                         ))}
                         {!locations.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                            <div
+                                className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
                                 No locations configured yet.
                             </div>
                         )}
@@ -613,8 +669,9 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
                     <p className="text-gray-500">Compare available locker subscriptions and their benefits.</p>
                 </div>
-                <button onClick={() => setPlansMessage('Plans refreshed.')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-                    <RefreshCw className="w-4 h-4" /> Refresh
+                <button onClick={() => setPlansMessage('Plans refreshed.')}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+                    <RefreshCw className="w-4 h-4"/> Refresh
                 </button>
             </div>
             {plansMessage && (
@@ -622,18 +679,20 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             )}
             {plansLoading ? (
                 <div className="flex justify-center items-center h-40">
-                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin"/>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {plans.map((plan) => (
-                        <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
+                        <div key={plan.id}
+                             className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
                             <div className="absolute right-6 top-6">
-                                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">{plan.isActive ? 'Active' : 'Archived'}</span>
+                                <span
+                                    className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">{plan.isActive ? 'Active' : 'Archived'}</span>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
-                                    <Layers className="w-6 h-6" />
+                                    <Layers className="w-6 h-6"/>
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-semibold text-gray-900">{plan.name}</h3>
@@ -647,19 +706,28 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <p className="text-xs text-gray-400">${plan.yearlyPrice} billed yearly</p>
                             <ul className="mt-6 space-y-2">
                                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Up to {plan.features.maxLockers} lockers
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500"/>
+                                    Up to {plan.features?.maxLockers ?? 0} lockers
                                 </li>
                                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Sizes: {plan.features.lockerSizes.join(', ')}
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500"/>
+                                    Sizes: {plan.features?.lockerSizes?.join(', ') ?? 'N/A'}
                                 </li>
                                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {plan.features.maxReservationsPerMonth < 0 ? 'Unlimited reservations' : `${plan.features.maxReservationsPerMonth} reservations / month`}
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500"/>
+                                    {plan.features?.maxReservationsPerMonth != null
+                                        ? `${plan.features.maxReservationsPerMonth} reservations / month`
+                                        : 'Unlimited reservations'}
                                 </li>
                                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {plan.features.allowSharing ? `Share with up to ${plan.features.maxSharedUsers} users` : 'Sharing disabled'}
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500"/>
+                                    {plan.features?.allowSharing
+                                        ? `Share with up to ${plan.features?.maxSharedUsers ?? 0} users`
+                                        : 'Sharing disabled'}
                                 </li>
                                 <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Advance booking window: {plan.features.advancedBooking} days
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500"/>
+                                    Advance booking window: {plan.features?.advancedBooking ?? 0} days
                                 </li>
                             </ul>
                         </div>
@@ -681,7 +749,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         onClick={() => {
                             setCreateFormOpen((prev) => !prev);
-                            setCreateState({ loading: false, message: null, error: null });
+                            setCreateState({loading: false, message: null, error: null});
                             setCreateSubscriptionForm((prev) => ({
                                 ...prev,
                                 planId: prev.planId || plans[0]?.id || '',
@@ -689,7 +757,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             }));
                         }}
                     >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-4 h-4"/>
                         New Subscription
                     </button>
                     <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm">
@@ -701,8 +769,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             onChange={(event) => {
                                 const value = Number(event.target.value);
                                 setSelectedUserId(Number.isNaN(value) ? 0 : value);
-                                setAvailabilityForm((prev) => ({ ...prev, userId: Number.isNaN(value) ? 0 : value }));
-                                setReservationForm((prev) => ({ ...prev, userId: Number.isNaN(value) ? 0 : value }));
+                                setAvailabilityForm((prev) => ({...prev, userId: Number.isNaN(value) ? 0 : value}));
+                                setReservationForm((prev) => ({...prev, userId: Number.isNaN(value) ? 0 : value}));
                             }}
                             className="w-24 border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="User"
@@ -716,10 +784,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     <div className="flex items-start justify-between">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-900">Create Subscription</h3>
-                            <p className="text-sm text-gray-500">Select a plan, location and billing cycle to provision a new locker subscription.</p>
+                            <p className="text-sm text-gray-500">Select a plan, location and billing cycle to provision
+                                a new locker subscription.</p>
                         </div>
                         <button className="text-gray-400 hover:text-gray-600" onClick={resetCreateForm}>
-                            <X className="w-5 h-5" />
+                            <X className="w-5 h-5"/>
                         </button>
                     </div>
                     <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -727,7 +796,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <label className="text-sm font-medium text-gray-700">Plan</label>
                             <select
                                 value={createSubscriptionForm.planId}
-                                onChange={(event) => setCreateSubscriptionForm((prev) => ({ ...prev, planId: event.target.value }))}
+                                onChange={(event) => setCreateSubscriptionForm((prev) => ({
+                                    ...prev,
+                                    planId: event.target.value
+                                }))}
                                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="" disabled>
@@ -744,7 +816,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <label className="text-sm font-medium text-gray-700">Location</label>
                             <select
                                 value={createSubscriptionForm.locationId}
-                                onChange={(event) => setCreateSubscriptionForm((prev) => ({ ...prev, locationId: event.target.value }))}
+                                onChange={(event) => setCreateSubscriptionForm((prev) => ({
+                                    ...prev,
+                                    locationId: event.target.value
+                                }))}
                                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="" disabled>
@@ -776,7 +851,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <input
                                 type="text"
                                 value={createSubscriptionForm.paymentMethodId}
-                                onChange={(event) => setCreateSubscriptionForm((prev) => ({ ...prev, paymentMethodId: event.target.value }))}
+                                onChange={(event) => setCreateSubscriptionForm((prev) => ({
+                                    ...prev,
+                                    paymentMethodId: event.target.value
+                                }))}
                                 placeholder="Payment method reference"
                                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
@@ -786,7 +864,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 id="autoRenew"
                                 type="checkbox"
                                 checked={createSubscriptionForm.autoRenew}
-                                onChange={(event) => setCreateSubscriptionForm((prev) => ({ ...prev, autoRenew: event.target.checked }))}
+                                onChange={(event) => setCreateSubscriptionForm((prev) => ({
+                                    ...prev,
+                                    autoRenew: event.target.checked
+                                }))}
                                 className="h-4 w-4 text-blue-600"
                             />
                             <label htmlFor="autoRenew" className="text-sm text-gray-600">
@@ -800,13 +881,15 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         </div>
                         <div className="flex items-center gap-3">
                             {createState.error && <span className="text-sm text-red-600">{createState.error}</span>}
-                            {createState.message && <span className="text-sm text-emerald-600">{createState.message}</span>}
+                            {createState.message &&
+                                <span className="text-sm text-emerald-600">{createState.message}</span>}
                             <button
                                 onClick={handleCreateSubscription}
                                 disabled={createState.loading}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
                             >
-                                {createState.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create subscription'}
+                                {createState.loading ?
+                                    <Loader2 className="w-4 h-4 animate-spin"/> : 'Create subscription'}
                             </button>
                         </div>
                     </div>
@@ -815,7 +898,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
             {subscriptionsLoading ? (
                 <div className="flex justify-center items-center h-40">
-                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin"/>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -830,7 +913,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <h3 className="text-lg font-semibold text-gray-900">{subscription.planName}</h3>
-                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">{subscription.status}</span>
+                                                <span
+                                                    className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">{subscription.status}</span>
                                             </div>
                                             <p className="text-sm text-gray-500">{subscription.locationName}</p>
                                             <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-500">
@@ -853,7 +937,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                 className="px-3 py-2 text-sm border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
                                                 onClick={() => {
                                                     setExpandedSubscriptionId(subscription.id);
-                                                    setUpgradeState({ loading: false, message: null, error: null });
+                                                    setUpgradeState({loading: false, message: null, error: null});
                                                 }}
                                             >
                                                 Upgrade
@@ -871,32 +955,49 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         <div className="border-t border-gray-100 pt-4 space-y-4">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div className="border border-gray-100 rounded-lg p-4">
-                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Assigned lockers</h4>
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Assigned
+                                                        lockers</h4>
                                                     <div className="space-y-2">
                                                         {subscription.assignedLockers.length ? (
                                                             subscription.assignedLockers.map((locker) => (
-                                                                <div key={locker.lockerId} className="flex items-center justify-between text-sm text-gray-600">
+                                                                <div key={locker.lockerId}
+                                                                     className="flex items-center justify-between text-sm text-gray-600">
                                                                     <span>{locker.lockerNumber} · {locker.size}</span>
-                                                                    <span className="text-xs text-gray-400">{locker.isAvailable ? 'Available' : 'In use'}</span>
+                                                                    <span
+                                                                        className="text-xs text-gray-400">{locker.isAvailable ? 'Available' : 'In use'}</span>
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <p className="text-sm text-gray-400">No lockers assigned yet.</p>
+                                                            <p className="text-sm text-gray-400">No lockers assigned
+                                                                yet.</p>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <div className="border border-gray-100 rounded-lg p-4">
-                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Plan features</h4>
-                                                    <div className="text-xs text-gray-500 space-y-1">
-                                                        <p>Max lockers: <strong>{subscription.features.maxLockers}</strong></p>
-                                                        <p>Sharing: <strong>{subscription.features.allowSharing ? `Up to ${subscription.features.maxSharedUsers}` : 'Disabled'}</strong></p>
-                                                        <p>Current shared users: <strong>{subscription.features.currentSharedUsers || 0}</strong></p>
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Plan
+                                                        features</h4>
+                                                    <div className="text-xs text-gray-500 space-y-1"><p>Max
+                                                        lockers: <strong>{subscription.features?.maxLockers ?? 0}</strong>
+                                                    </p>
+                                                        <p>
+                                                            Sharing:
+                                                            <strong>
+                                                                {subscription.features?.allowSharing
+                                                                    ? `Up to ${subscription.features?.maxSharedUsers ?? 0}`
+                                                                    : 'Disabled'}
+                                                            </strong>
+                                                        </p>
+                                                        <p>
+                                                            Current shared users:
+                                                            <strong>{subscription.features?.currentSharedUsers ?? 0}</strong>
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="border border-gray-100 rounded-lg p-4">
-                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Upgrade plan</h4>
+                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Upgrade
+                                                    plan</h4>
                                                 <div className="flex flex-col lg:flex-row lg:items-center gap-3">
                                                     <select
                                                         className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -909,21 +1010,25 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                         ))}
                                                     </select>
                                                     <div className="flex items-center gap-3">
-                                                        {upgradeState.error && <span className="text-sm text-red-600">{upgradeState.error}</span>}
-                                                        {upgradeState.message && <span className="text-sm text-emerald-600">{upgradeState.message}</span>}
+                                                        {upgradeState.error && <span
+                                                            className="text-sm text-red-600">{upgradeState.error}</span>}
+                                                        {upgradeState.message && <span
+                                                            className="text-sm text-emerald-600">{upgradeState.message}</span>}
                                                         <button
                                                             onClick={() => handleUpgradeSubscription(subscription.id)}
                                                             disabled={upgradeState.loading}
                                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
                                                         >
-                                                            {upgradeState.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Upgrade plan'}
+                                                            {upgradeState.loading ? <Loader2
+                                                                className="w-4 h-4 animate-spin"/> : 'Upgrade plan'}
                                                         </button>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="border border-gray-100 rounded-lg p-4">
-                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Share access</h4>
+                                                <h4 className="text-sm font-semibold text-gray-800 mb-3">Share
+                                                    access</h4>
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                     <div>
                                                         <label className="text-xs text-gray-500">User ID</label>
@@ -958,30 +1063,38 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                             value={sharingForm.permissions}
                                                             onChange={(event) => {
                                                                 const selected = Array.from(event.target.selectedOptions).map((option) => option.value);
-                                                                setSharingForm((prev) => ({ ...prev, permissions: selected }));
+                                                                setSharingForm((prev) => ({
+                                                                    ...prev,
+                                                                    permissions: selected
+                                                                }));
                                                             }}
                                                             className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm h-24"
                                                         >
                                                             {['VIEW', 'BOOK', 'EXTEND', 'MANAGE', 'CANCEL', 'SHARE'].map((permission) => (
-                                                                <option key={permission} value={permission}>{permission}</option>
+                                                                <option key={permission}
+                                                                        value={permission}>{permission}</option>
                                                             ))}
                                                         </select>
                                                     </div>
                                                 </div>
-                                                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                <div
+                                                    className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                        <Info className="w-4 h-4 text-blue-500" />
+                                                        <Info className="w-4 h-4 text-blue-500"/>
                                                         Invitees will receive email instructions to access lockers.
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        {sharingState.error && <span className="text-sm text-red-600">{sharingState.error}</span>}
-                                                        {sharingState.message && <span className="text-sm text-emerald-600">{sharingState.message}</span>}
+                                                        {sharingState.error && <span
+                                                            className="text-sm text-red-600">{sharingState.error}</span>}
+                                                        {sharingState.message && <span
+                                                            className="text-sm text-emerald-600">{sharingState.message}</span>}
                                                         <button
                                                             onClick={() => handleShareSubscription(subscription.id)}
                                                             disabled={sharingState.loading}
                                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
                                                         >
-                                                            {sharingState.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send invite'}
+                                                            {sharingState.loading ? <Loader2
+                                                                className="w-4 h-4 animate-spin"/> : 'Send invite'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -990,7 +1103,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                                 <div className="border border-gray-100 rounded-lg p-4">
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <h4 className="text-sm font-semibold text-gray-800">Usage insights</h4>
+                                                        <h4 className="text-sm font-semibold text-gray-800">Usage
+                                                            insights</h4>
                                                         <button
                                                             className="text-xs text-blue-600 hover:underline"
                                                             onClick={() => handleLoadUsage(subscription.id)}
@@ -1000,18 +1114,28 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                     </div>
                                                     {usage ? (
                                                         <div className="text-xs text-gray-600 space-y-2">
-                                                            <p>Reservations this month: <strong>{usage.reservationUsage.reservationsThisMonth}/{usage.reservationUsage.maxReservationsPerMonth}</strong></p>
-                                                            <p>Utilisation rate: <strong>{usage.reservationUsage.utilizationRate}%</strong></p>
-                                                            <p>Active shared users: <strong>{usage.sharingUsage.activeSharedUsers}/{usage.sharingUsage.maxSharedUsers}</strong></p>
-                                                            <p>Monthly charge: <strong>${usage.financialSummary.monthlyCharge}</strong></p>
+                                                            <p>Reservations this
+                                                                month: <strong>{usage.reservationUsage.reservationsThisMonth}/{usage.reservationUsage.maxReservationsPerMonth}</strong>
+                                                            </p>
+                                                            <p>Utilisation
+                                                                rate: <strong>{usage.reservationUsage.utilizationRate}%</strong>
+                                                            </p>
+                                                            <p>Active shared
+                                                                users: <strong>{usage.sharingUsage.activeSharedUsers}/{usage.sharingUsage.maxSharedUsers}</strong>
+                                                            </p>
+                                                            <p>Monthly
+                                                                charge: <strong>${usage.financialSummary.monthlyCharge}</strong>
+                                                            </p>
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-gray-400">Click refresh to load usage analytics.</p>
+                                                        <p className="text-xs text-gray-400">Click refresh to load usage
+                                                            analytics.</p>
                                                     )}
                                                 </div>
                                                 <div className="border border-gray-100 rounded-lg p-4">
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <h4 className="text-sm font-semibold text-gray-800">Family calendar</h4>
+                                                        <h4 className="text-sm font-semibold text-gray-800">Family
+                                                            calendar</h4>
                                                         <button
                                                             className="text-xs text-blue-600 hover:underline"
                                                             onClick={() => handleLoadCalendar(subscription.id)}
@@ -1022,17 +1146,20 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                     {calendar ? (
                                                         <div className="space-y-2">
                                                             {(calendar.timeSlots ?? []).slice(0, 3).map((slot) => (
-                                                                <div key={slot.startTime} className="text-xs text-gray-600">
+                                                                <div key={slot.startTime}
+                                                                     className="text-xs text-gray-600">
                                                                     <p className="font-semibold text-gray-800">{new Date(slot.startTime).toLocaleString()} - {new Date(slot.endTime).toLocaleTimeString()}</p>
                                                                     <p className="text-gray-500">Status: {slot.status}</p>
                                                                     {(slot.reservations ?? []).map((reservation) => (
-                                                                        <p key={reservation.reservationId} className="text-gray-400">• {reservation.userName} ({reservation.reservationType})</p>
+                                                                        <p key={reservation.reservationId}
+                                                                           className="text-gray-400">• {reservation.userName} ({reservation.reservationType})</p>
                                                                     ))}
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-gray-400">Load the calendar to view family reservations and potential conflicts.</p>
+                                                        <p className="text-xs text-gray-400">Load the calendar to view
+                                                            family reservations and potential conflicts.</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -1044,7 +1171,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     })}
 
                     {!subscriptions.length && (
-                        <div className="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-gray-500">
+                        <div
+                            className="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-gray-500">
                             No active subscriptions yet. Start by creating one using the button above.
                         </div>
                     )}
@@ -1059,14 +1187,16 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     </div>
                     <div className="divide-y divide-gray-100">
                         {accessibleSubscriptions.map((subscription) => (
-                            <div key={subscription.id} className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div key={subscription.id}
+                                 className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">{subscription.planName} · {subscription.locationName}</p>
                                     <p className="text-xs text-gray-500">Access: {subscription.accessType}</p>
                                     <p className="text-xs text-gray-400">Permissions: {subscription.permissions.join(', ')}</p>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <ShieldCheck className="w-4 h-4 text-emerald-500" /> Shared by {subscription.ownerName || 'Unknown'}
+                                    <ShieldCheck className="w-4 h-4 text-emerald-500"/> Shared
+                                    by {subscription.ownerName || 'Unknown'}
                                 </div>
                             </div>
                         ))}
@@ -1088,8 +1218,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         value={selectedLocationId}
                         onChange={(event) => {
                             setSelectedLocationId(event.target.value);
-                            setAvailabilityForm((prev) => ({ ...prev, locationId: event.target.value }));
-                            setReservationForm((prev) => ({ ...prev, locationId: event.target.value }));
+                            setAvailabilityForm((prev) => ({...prev, locationId: event.target.value}));
+                            setReservationForm((prev) => ({...prev, locationId: event.target.value}));
                         }}
                         className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -1100,7 +1230,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             </option>
                         ))}
                     </select>
-                    <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg" onClick={() => setSelectedLocationId('')}>
+                    <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                            onClick={() => setSelectedLocationId('')}>
                         Clear
                     </button>
                 </div>
@@ -1114,7 +1245,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 <h3 className="text-lg font-semibold text-gray-900">Location overview</h3>
                                 <p className="text-sm text-gray-500">Key metrics for the selected site.</p>
                             </div>
-                            <MapPin className="w-5 h-5 text-blue-600" />
+                            <MapPin className="w-5 h-5 text-blue-600"/>
                         </div>
                         {selectedLocationId ? (
                             <div className="p-5">
@@ -1124,7 +1255,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         <div key={location.id} className="space-y-3">
                                             <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                                                 <span>Total lockers: <strong>{location.totalLockers}</strong></span>
-                                                <span>Available: <strong className="text-emerald-600">{location.availableLockers}</strong></span>
+                                                <span>Available: <strong
+                                                    className="text-emerald-600">{location.availableLockers}</strong></span>
                                                 <span>Status: <strong>{location.status}</strong></span>
                                             </div>
                                             {location.features && (
@@ -1162,17 +1294,20 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         {locationLockers.length ? (
                             <div className="divide-y divide-gray-100">
                                 {locationLockers.map((locker) => (
-                                    <div key={locker.id} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div key={locker.id}
+                                         className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                         <div>
                                             <p className="text-sm font-semibold text-gray-900">Locker {locker.lockerNumber}</p>
                                             <p className="text-xs text-gray-500">Size {locker.size} · {locker.features?.join(', ')}</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className={cn('text-xs font-semibold px-2 py-1 rounded-full', locker.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                            <span
+                                                className={cn('text-xs font-semibold px-2 py-1 rounded-full', locker.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
                                                 {locker.status}
                                             </span>
                                             {locker.nextAvailableFrom && (
-                                                <span className="text-xs text-gray-400">Next available {new Date(locker.nextAvailableFrom).toLocaleString()}</span>
+                                                <span
+                                                    className="text-xs text-gray-400">Next available {new Date(locker.nextAvailableFrom).toLocaleString()}</span>
                                             )}
                                         </div>
                                     </div>
@@ -1188,19 +1323,25 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-lg font-semibold text-gray-900">Check availability</h3>
-                            <Clock className="w-5 h-5 text-blue-600" />
+                            <Clock className="w-5 h-5 text-blue-600"/>
                         </div>
                         <div className="space-y-3">
                             <input
                                 type="datetime-local"
                                 value={availabilityForm.requestedFrom}
-                                onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, requestedFrom: event.target.value }))}
+                                onChange={(event) => setAvailabilityForm((prev) => ({
+                                    ...prev,
+                                    requestedFrom: event.target.value
+                                }))}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             />
                             <input
                                 type="datetime-local"
                                 value={availabilityForm.requestedUntil}
-                                onChange={(event) => setAvailabilityForm((prev) => ({ ...prev, requestedUntil: event.target.value }))}
+                                onChange={(event) => setAvailabilityForm((prev) => ({
+                                    ...prev,
+                                    requestedUntil: event.target.value
+                                }))}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             />
                             <select
@@ -1222,11 +1363,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 disabled={availabilityState.loading}
                             >
-                                {availabilityState.loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Check availability'}
+                                {availabilityState.loading ?
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto"/> : 'Check availability'}
                             </button>
-                            {availabilityState.error && <p className="text-xs text-red-600">{availabilityState.error}</p>}
+                            {availabilityState.error &&
+                                <p className="text-xs text-red-600">{availabilityState.error}</p>}
                             {availabilityResult && (
-                                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-2">
+                                <div
+                                    className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-2">
                                     <p className="font-semibold text-blue-800">Availability result</p>
                                     <p>{availabilityResult.isAvailable ? 'Lockers are available for this slot.' : availabilityResult.reason}</p>
                                     <div className="space-y-1">
@@ -1244,7 +1388,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         <div className="space-y-3">
                             <select
                                 value={reservationForm.lockerId}
-                                onChange={(event) => setReservationForm((prev) => ({ ...prev, lockerId: event.target.value }))}
+                                onChange={(event) => setReservationForm((prev) => ({
+                                    ...prev,
+                                    lockerId: event.target.value
+                                }))}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             >
                                 <option value="">Select locker</option>
@@ -1257,19 +1404,28 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <input
                                 type="datetime-local"
                                 value={reservationForm.reservedFrom}
-                                onChange={(event) => setReservationForm((prev) => ({ ...prev, reservedFrom: event.target.value }))}
+                                onChange={(event) => setReservationForm((prev) => ({
+                                    ...prev,
+                                    reservedFrom: event.target.value
+                                }))}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             />
                             <input
                                 type="datetime-local"
                                 value={reservationForm.reservedUntil}
-                                onChange={(event) => setReservationForm((prev) => ({ ...prev, reservedUntil: event.target.value }))}
+                                onChange={(event) => setReservationForm((prev) => ({
+                                    ...prev,
+                                    reservedUntil: event.target.value
+                                }))}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             />
                             <input
                                 type="text"
                                 value={reservationForm.notes || ''}
-                                onChange={(event) => setReservationForm((prev) => ({ ...prev, notes: event.target.value }))}
+                                onChange={(event) => setReservationForm((prev) => ({
+                                    ...prev,
+                                    notes: event.target.value
+                                }))}
                                 placeholder="Reservation notes"
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                             />
@@ -1278,10 +1434,12 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 className="w-full px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                                 disabled={reservationState.loading}
                             >
-                                {reservationState.loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Create reservation'}
+                                {reservationState.loading ?
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto"/> : 'Create reservation'}
                             </button>
                             {reservationState.error && <p className="text-xs text-red-600">{reservationState.error}</p>}
-                            {reservationState.message && <p className="text-xs text-emerald-600">{reservationState.message}</p>}
+                            {reservationState.message &&
+                                <p className="text-xs text-emerald-600">{reservationState.message}</p>}
                         </div>
                     </div>
 
@@ -1290,12 +1448,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         <div className="space-y-2">
                             {accessibleLockers.length ? (
                                 accessibleLockers.slice(0, 6).map((locker) => (
-                                    <div key={locker.id} className="flex items-center justify-between text-xs text-gray-600 border border-gray-100 rounded-lg px-3 py-2">
+                                    <div key={locker.id}
+                                         className="flex items-center justify-between text-xs text-gray-600 border border-gray-100 rounded-lg px-3 py-2">
                                         <div>
                                             <p className="font-semibold text-gray-800">Locker {locker.lockerNumber}</p>
                                             <p className="text-gray-400">{locker.locationName} · {locker.size}</p>
                                         </div>
-                                        <span className={cn('px-2 py-1 rounded-full font-semibold', locker.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+                                        <span
+                                            className={cn('px-2 py-1 rounded-full font-semibold', locker.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
                                             {locker.status}
                                         </span>
                                     </div>
@@ -1352,7 +1512,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h3 className="text-lg font-semibold text-gray-900">Locker {reservation.lockerNumber}</h3>
-                                            <span className={cn('text-xs font-semibold px-2 py-1 rounded-full', reservation.status === 'ACTIVE' || reservation.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-600')}>
+                                            <span
+                                                className={cn('text-xs font-semibold px-2 py-1 rounded-full', reservation.status === 'ACTIVE' || reservation.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-600')}>
                                                 {reservation.status}
                                             </span>
                                         </div>
@@ -1395,7 +1556,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">Locker Management</h1>
-                        <p className="text-gray-500">Administer subscription plans, allocate lockers and monitor reservations.</p>
+                        <p className="text-gray-500">Administer subscription plans, allocate lockers and monitor
+                            reservations.</p>
                     </div>
                     <div className="text-sm text-gray-400">
                         <p>Signed in as <strong>{user?.name || 'Admin'}</strong></p>
