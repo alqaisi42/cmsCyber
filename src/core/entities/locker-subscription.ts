@@ -3,24 +3,18 @@
 
 export type BillingCycle = 'MONTHLY' | 'YEARLY';
 
-export interface SubscriptionPlanFeatures {
-    maxLockers: number;
-    lockerSizes: string[];
-    maxReservationsPerMonth: number;
-    allowSharing: boolean;
-    maxSharedUsers: number;
-    prioritySupport: boolean;
-    advancedBooking: number;
-}
-
 export interface LockerSubscriptionPlan {
     id: string;
-    name: string;
-    description: string;
+    planName: string;
+    planCode: string;
+    lockerCapacity: number;
+    maxConcurrentReservations: number;
     monthlyPrice: number;
-    yearlyPrice: number;
-    features: SubscriptionPlanFeatures;
-    isActive: boolean;
+    annualPrice: number;
+    sharingEnabled: boolean;
+    maxSharedUsers: number;
+    description?: string;
+    isActive?: boolean;
 }
 
 export type SubscriptionStatus = 'ACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
