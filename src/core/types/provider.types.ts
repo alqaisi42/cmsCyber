@@ -64,7 +64,7 @@ export interface UpdateProviderRequest {
     description?: string;
     businessRegistrationNumber?: string;
     taxNumber?: string;
-    address?: ProviderAddress;
+    address?: Partial<ProviderAddress>;
     commissionPercentage?: number;
     isActive?: boolean;
     rating?: number;

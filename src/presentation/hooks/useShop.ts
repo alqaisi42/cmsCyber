@@ -26,8 +26,10 @@ import {
     ProductSearchParams,
     ProviderSummary,
     ProviderStatistics,
+    ProductCategorySummary,
 } from '../../core/entities/ecommerce';
 import {CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest} from '@/core/types/provider.types';
+import { ProviderCategoryCreateRequest, ProviderCategoryUpdateRequest } from '@/core/types/category.types';
 import {ApiResponse, PaginatedResponse} from '../../core/interfaces/repositories';
 
 // =============================================================================
@@ -453,6 +455,64 @@ export function useDeleteCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ['categories']});
+        },
+    });
+}
+
+// =============================================================================
+// PROVIDER CATEGORY HOOKS
+// =============================================================================
+
+export function useProviderCategories(providerId: string, options?: { activeOnly?: boolean }) {
+    return useQuery<ProductCategorySummary[], Error>({
+        queryKey: ['provider-categories', providerId, options?.activeOnly ?? false],
+        queryFn: async () => {
+            const response = await categoryService.getProviderCategories(providerId, options);
+            return response.data;
+        },
+        enabled: !!providerId,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useCreateProviderCategory(providerId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: ProviderCategoryCreateRequest) => {
+            const response = await categoryService.createProviderCategory(providerId, payload);
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['provider-categories', providerId]});
+        },
+    });
+}
+
+export function useUpdateProviderCategory(providerId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({categoryId, data}: { categoryId: string; data: ProviderCategoryUpdateRequest }) => {
+            const response = await categoryService.updateProviderCategory(providerId, categoryId, data);
+            return response.data;
+        },
+        onSuccess: (updatedCategory) => {
+            queryClient.invalidateQueries({queryKey: ['provider-categories', providerId]});
+            queryClient.invalidateQueries({queryKey: ['category', updatedCategory.id]});
+        },
+    });
+}
+
+export function useDeleteProviderCategory(providerId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (categoryId: string) => {
+            await categoryService.deleteProviderCategory(providerId, categoryId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['provider-categories', providerId]});
         },
     });
 }

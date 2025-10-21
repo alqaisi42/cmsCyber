@@ -14,6 +14,7 @@ import {
     ProductSearchParams,
     ProviderSummary,
     ProviderStatistics,
+    ProductCategorySummary,
 } from '../../core/entities/ecommerce';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 import {
@@ -22,6 +23,10 @@ import {
     CreateProviderRequest,
     UpdateProviderRequest,
 } from '../../core/types/provider.types';
+import {
+    ProviderCategoryCreateRequest,
+    ProviderCategoryUpdateRequest,
+} from '../../core/types/category.types';
 
 // ============================================================================
 // SPRING BOOT RESPONSE TYPES
@@ -488,10 +493,20 @@ class ProductVariantService {
 
 class CategoryService {
     private readonly baseUrl = '/api/v1/categories';
+    private readonly providerBaseUrl = '/api/v1/providers';
+
+    private getAuthHeaders(): Record<string, string> {
+        if (typeof window === 'undefined') {
+            return {};
+        }
+        const token = localStorage.getItem('auth_token');
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    }
 
     async getCategories(): Promise<ApiResponse<Category[]>> {
         const response = await fetch(this.baseUrl, {
-            cache: 'no-store'
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -499,7 +514,8 @@ class CategoryService {
 
     async getCategoryById(id: string): Promise<ApiResponse<Category>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
-            cache: 'no-store'
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
@@ -508,7 +524,7 @@ class CategoryService {
     async createCategory(category: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'subcategories'>): Promise<ApiResponse<Category>> {
         const response = await fetch(this.baseUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
             body: JSON.stringify(category)
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -518,7 +534,7 @@ class CategoryService {
     async updateCategory(id: string, category: Partial<Category>): Promise<ApiResponse<Category>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
             body: JSON.stringify(category)
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -527,8 +543,73 @@ class CategoryService {
 
     async deleteCategory(id: string): Promise<ApiResponse<void>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: this.getAuthHeaders(),
         });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async getProviderCategories(
+        providerId: string,
+        options?: { activeOnly?: boolean }
+    ): Promise<ApiResponse<ProductCategorySummary[]>> {
+        const searchParams = new URLSearchParams();
+        if (options?.activeOnly) {
+            searchParams.set('activeOnly', String(options.activeOnly));
+        }
+
+        const url = searchParams.toString()
+            ? `${this.providerBaseUrl}/${providerId}/categories?${searchParams.toString()}`
+            : `${this.providerBaseUrl}/${providerId}/categories`;
+
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: this.getAuthHeaders(),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async createProviderCategory(
+        providerId: string,
+        payload: ProviderCategoryCreateRequest,
+    ): Promise<ApiResponse<ProductCategorySummary>> {
+        const response = await fetch(`${this.providerBaseUrl}/${providerId}/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async updateProviderCategory(
+        providerId: string,
+        categoryId: string,
+        payload: ProviderCategoryUpdateRequest,
+    ): Promise<ApiResponse<ProductCategorySummary>> {
+        const response = await fetch(`${this.providerBaseUrl}/${providerId}/categories/${categoryId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    }
+
+    async deleteProviderCategory(
+        providerId: string,
+        categoryId: string,
+    ): Promise<ApiResponse<void>> {
+        const response = await fetch(`${this.providerBaseUrl}/${providerId}/categories/${categoryId}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders(),
+        });
+
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     }

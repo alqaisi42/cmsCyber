@@ -17,8 +17,24 @@ export default function NewProviderPage() {
         setServerError(null);
         try {
             await createProvider.mutateAsync({
-                ...values,
-                // Default to active when unchecked for safety
+                name: values.name,
+                logoUrl: values.logoUrl,
+                contactEmail: values.contactEmail,
+                contactPhone: values.contactPhone,
+                website: values.website,
+                description: values.description,
+                businessRegistrationNumber: values.businessRegistrationNumber,
+                taxNumber: values.taxNumber,
+                address: {
+                    street: values.address.street,
+                    city: values.address.city,
+                    state: values.address.state,
+                    postalCode: values.address.postalCode,
+                    country: values.address.country,
+                    latitude: values.address.latitude ?? null,
+                    longitude: values.address.longitude ?? null,
+                },
+                commissionPercentage: values.commissionPercentage,
                 isActive: values.isActive ?? true,
             });
             router.push('/dashboard/shop/providers');
