@@ -22,7 +22,9 @@ export default function UserLockerModal({ userId, userName, onClose }: UserLocke
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dashboard, setDashboard] = useState<UserLockerDashboard | null>(null);
-    const [activeTab, setActiveTab] = useState<'subscriptions' | 'reservations' | 'sharing' | 'status'>('subscriptions');
+    const [activeTab, setActiveTab] = useState<
+        'subscriptions' | 'reservations' | 'sharing' | 'stats'
+    >('subscriptions');
 
     useEffect(() => {
         fetchLockerDashboard();
