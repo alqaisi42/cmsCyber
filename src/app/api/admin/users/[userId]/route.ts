@@ -9,11 +9,14 @@ function buildBackendUrl(userId: string) {
 async function forwardRequest(request: Request, userId: string) {
     const backendUrl = buildBackendUrl(userId);
 
+    const authorization = request.headers.get('authorization');
+
     const init: RequestInit = {
         method: request.method,
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
+            ...(authorization ? { Authorization: authorization } : {}),
         },
         cache: 'no-store',
     };
@@ -32,6 +35,22 @@ async function forwardRequest(request: Request, userId: string) {
 
     const text = await response.text();
     return new NextResponse(text, { status: response.status });
+}
+
+export async function GET(request: Request, { params }: { params: { userId: string } }) {
+    try {
+        return await forwardRequest(request, params.userId);
+    } catch (error) {
+        console.error('Failed to proxy admin user fetch:', error);
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'Failed to fetch user',
+                errors: [error instanceof Error ? error.message : 'Unknown error'],
+            },
+            { status: 500 },
+        );
+    }
 }
 
 export async function PUT(request: Request, { params }: { params: { userId: string } }) {

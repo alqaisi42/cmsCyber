@@ -4,6 +4,7 @@ const BACKEND_BASE_URL = process.env.ADMIN_API_BASE_URL ?? 'http://148.230.111.2
 
 export async function POST(request: Request, { params }: { params: { userId: string } }) {
     const backendUrl = new URL(`/api/v1/admin/users/${params.userId}/reset-password`, BACKEND_BASE_URL);
+    const authorization = request.headers.get('authorization');
 
     try {
         const response = await fetch(backendUrl, {
@@ -11,9 +12,9 @@ export async function POST(request: Request, { params }: { params: { userId: str
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
+                ...(authorization ? { Authorization: authorization } : {}),
             },
             cache: 'no-store',
-            body: await request.text(),
         });
 
         const contentType = response.headers.get('content-type') ?? '';
@@ -26,7 +27,7 @@ export async function POST(request: Request, { params }: { params: { userId: str
         const text = await response.text();
         return new NextResponse(text, { status: response.status });
     } catch (error) {
-        console.error('Failed to proxy admin reset password request:', error);
+        console.error('Failed to proxy admin user password reset:', error);
         return NextResponse.json(
             {
                 success: false,

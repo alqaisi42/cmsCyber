@@ -16,12 +16,15 @@ function buildBackendUrl(request: Request, path = '/api/v1/admin/users'): URL {
 export async function GET(request: Request) {
     const backendUrl = buildBackendUrl(request);
 
+    const authorization = request.headers.get('authorization');
+
     try {
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 Accept: 'application/json',
                 'Content-Type': 'application/json',
+                ...(authorization ? { Authorization: authorization } : {}),
             },
             cache: 'no-store',
         });
@@ -41,6 +44,45 @@ export async function GET(request: Request) {
             {
                 success: false,
                 message: 'Failed to fetch users',
+                errors: [error instanceof Error ? error.message : 'Unknown error'],
+            },
+            { status: 500 },
+        );
+    }
+}
+
+export async function POST(request: Request) {
+    const backendUrl = new URL('/api/v1/admin/users', BACKEND_BASE_URL);
+    const authorization = request.headers.get('authorization');
+
+    try {
+        const body = await request.text();
+        const response = await fetch(backendUrl, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                ...(authorization ? { Authorization: authorization } : {}),
+            },
+            cache: 'no-store',
+            body,
+        });
+
+        const contentType = response.headers.get('content-type') ?? '';
+
+        if (contentType.includes('application/json')) {
+            const data = await response.json();
+            return NextResponse.json(data, { status: response.status });
+        }
+
+        const text = await response.text();
+        return new NextResponse(text, { status: response.status });
+    } catch (error) {
+        console.error('Failed to proxy admin user create:', error);
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'Failed to create user',
                 errors: [error instanceof Error ? error.message : 'Unknown error'],
             },
             { status: 500 },

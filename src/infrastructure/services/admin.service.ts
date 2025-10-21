@@ -47,12 +47,19 @@ export interface UsersResponse {
     success: boolean;
     data: {
         users: AdminUser[];
-        totalElements: number;
-        totalPages: number;
-        currentPage: number;
-        pageSize: number;
-        isFirst: boolean;
-        isLast: boolean;
+        pagination?: {
+            currentPage: number;
+            pageSize: number;
+            totalPages: number;
+            totalElements: number;
+            hasNext?: boolean;
+            hasPrevious?: boolean;
+        };
+        appliedFilters?: Record<string, string | number | boolean | null>;
+        totalElements?: number;
+        totalPages?: number;
+        currentPage?: number;
+        pageSize?: number;
     };
     message: string;
     errors: string[];
@@ -62,12 +69,42 @@ export interface UsersResponse {
 export interface UserStatistics {
     totalUsers: number;
     activeUsers: number;
-    verifiedUsers: number;
-    twoFactorUsers: number;
+    inactiveUsers: number;
+    verifiedEmails: number;
+    unverifiedEmails: number;
+    verifiedPhones: number;
+    twoFactorEnabled: number;
+    lockedAccounts: number;
+    usersByRole: Record<string, number>;
+    usersBySocialProvider: Record<string, number>;
+    registrationTrend: { date: string; count: number }[];
+    loginActivity: {
+        last24Hours: number;
+        last7Days: number;
+        last30Days: number;
+    };
     newUsersToday: number;
     newUsersThisWeek: number;
     newUsersThisMonth: number;
-    usersByRole: Record<string, number>;
+    averageSessionDuration?: string;
+    topCountries?: {
+        country: string;
+        userCount: number;
+        percentage: number;
+    }[];
+}
+
+export interface CreateUserPayload {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword?: string;
+    phoneNumber?: string;
+    role: string;
+    isActive?: boolean;
+    emailVerified?: boolean;
+    phoneVerified?: boolean;
+    profileImageUrl?: string | null;
 }
 
 export interface StatisticsResponse {
@@ -80,6 +117,21 @@ export interface StatisticsResponse {
 
 class AdminUserService {
     private readonly baseUrl = '/api/admin/users';
+
+    private buildHeaders(additional: HeadersInit = {}): HeadersInit {
+        const headers: HeadersInit = {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...additional,
+        };
+
+        const token = this.getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return headers;
+    }
 
     async getUsers(filters: UserFilters = {}): Promise<UsersResponse> {
         const params = new URLSearchParams();
@@ -106,12 +158,7 @@ class AdminUserService {
             // Call the Next.js API route which proxies to the backend to avoid CORS issues
             const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
                 method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    // Add authorization header if needed
-                    // 'Authorization': `Bearer ${this.getToken()}`
-                }
+                headers: this.buildHeaders(),
             });
 
             if (!response.ok) {
@@ -130,10 +177,7 @@ class AdminUserService {
         try {
             const response = await fetch(`${this.baseUrl}/statistics`, {
                 method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                }
+                headers: this.buildHeaders(),
             });
 
             if (!response.ok) {
@@ -148,14 +192,30 @@ class AdminUserService {
         }
     }
 
+    async createUser(payload: CreateUserPayload): Promise<any> {
+        try {
+            const response = await fetch(`${this.baseUrl}`, {
+                method: 'POST',
+                headers: this.buildHeaders(),
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to create user:', error);
+            throw error;
+        }
+    }
+
     async updateUser(userId: number, data: Partial<AdminUser>): Promise<any> {
         try {
             const response = await fetch(`${this.baseUrl}/${userId}`, {
                 method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildHeaders(),
                 body: JSON.stringify(data)
             });
 
@@ -170,14 +230,29 @@ class AdminUserService {
         }
     }
 
+    async getUser(userId: number): Promise<any> {
+        try {
+            const response = await fetch(`${this.baseUrl}/${userId}`, {
+                method: 'GET',
+                headers: this.buildHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to fetch user details:', error);
+            throw error;
+        }
+    }
+
     async deleteUser(userId: number): Promise<void> {
         try {
             const response = await fetch(`${this.baseUrl}/${userId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                }
+                headers: this.buildHeaders(),
             });
 
             if (!response.ok) {
@@ -197,10 +272,7 @@ class AdminUserService {
         try {
             const response = await fetch(`${this.baseUrl}/${userId}/reset-password`, {
                 method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                }
+                headers: this.buildHeaders(),
             });
 
             if (!response.ok) {
@@ -216,6 +288,33 @@ class AdminUserService {
 
     async unlockUser(userId: number): Promise<any> {
         return this.updateUser(userId, { lockedUntil: null, loginAttempts: 0 });
+    }
+
+    async exportUsers(filters: UserFilters = {}): Promise<AdminUser[]> {
+        const params = new URLSearchParams();
+
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, String(value));
+            }
+        });
+
+        try {
+            const response = await fetch(`${this.baseUrl}/export?${params.toString()}`, {
+                method: 'GET',
+                headers: this.buildHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data?.data ?? [];
+        } catch (error) {
+            console.error('Failed to export users:', error);
+            throw error;
+        }
     }
 
     private getToken(): string | null {
