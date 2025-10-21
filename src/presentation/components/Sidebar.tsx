@@ -32,6 +32,11 @@ const navigationItems = [
         href: '/dashboard/admin/users',
         icon: UserCog,
     },
+    {
+        title: 'Orders',
+        href: '/dashboard/admin/orders',
+        icon: Package,
+    },
     // {
     //     title: 'Users',
     //     href: '/dashboard/users',
