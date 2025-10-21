@@ -1,0 +1,174 @@
+// src/core/entities/lockers.ts
+// Types describing locker locations, availability, and reservations
+
+export type LockerSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'EXTRA_LARGE';
+
+export interface LockerDimensions {
+    width: number;
+    height: number;
+    depth: number;
+    unit: string;
+}
+
+export type LockerStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'INACTIVE';
+
+export interface LockerFeature {
+    id: string;
+    label: string;
+}
+
+export interface LockerLocation {
+    id: string;
+    code: string;
+    name: string;
+    address: string;
+    city: string;
+    coordinates?: {
+        latitude: number;
+        longitude: number;
+    };
+    operatingHours?: Record<string, string>;
+    features?: string[];
+    availableLockerSizes?: LockerSize[];
+    totalLockers: number;
+    availableLockers: number;
+    status: 'ACTIVE' | 'INACTIVE';
+    createdAt?: string;
+}
+
+export interface LockerSummary {
+    id: string;
+    code: string;
+    lockerNumber: string;
+    subscriptionId?: string;
+    locationId: string;
+    locationName?: string;
+    size: LockerSize;
+    status: LockerStatus;
+    dimensions?: LockerDimensions;
+    features?: string[];
+    currentReservation?: LockerReservation | null;
+    nextAvailableFrom?: string | null;
+    isActive?: boolean;
+}
+
+export interface LockerAvailabilityRequest {
+    userId: number;
+    locationId: string;
+    requiredSize: LockerSize;
+    requestedFrom: string;
+    requestedUntil: string;
+    reservationType?: string;
+}
+
+export interface LockerAvailabilityResult {
+    isAvailable: boolean;
+    locationId: string;
+    locationName: string;
+    requestedSize: LockerSize;
+    requestedFrom: string;
+    requestedUntil: string;
+    availableLockers: Array<{
+        lockerId: string;
+        lockerNumber: string;
+        size: LockerSize;
+        subscriptionId?: string;
+    }>;
+    alternativeTimeSlots?: Array<{
+        startTime: string;
+        endTime: string;
+        availableLockers: number;
+    }>;
+    reason?: string | null;
+}
+
+export interface LockerReservationRequest {
+    userId: number;
+    lockerId: string;
+    locationId: string;
+    reservedFrom: string;
+    reservedUntil: string;
+    reservationType: string;
+    orderId?: string;
+    notes?: string;
+}
+
+export interface LockerReservation {
+    id: string;
+    userId: number;
+    userName?: string;
+    lockerId: string;
+    lockerNumber: string;
+    lockerSize: LockerSize;
+    locationId: string;
+    locationName: string;
+    locationAddress?: string;
+    status: 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+    reservationType: string;
+    orderId?: string;
+    reservedFrom: string;
+    reservedUntil: string;
+    accessCode?: string;
+    accessCodeExpiresAt?: string;
+    qrCode?: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface LockerReservationActionResponse {
+    success: boolean;
+    message: string;
+    reservationId?: string;
+    lockerId?: string;
+    lockerNumber?: string;
+    previousEndTime?: string;
+    newEndTime?: string;
+    extensionDuration?: number;
+    additionalCharge?: number;
+}
+
+export interface LockerAccessValidationResult {
+    success: boolean;
+    data: boolean;
+    message: string;
+    errors?: string[];
+    timestamp?: string;
+}
+
+export interface FamilyCalendarReservation {
+    reservationId: string;
+    lockerId: string;
+    lockerNumber: string;
+    userId: number;
+    userName: string;
+    reservationType: string;
+    orderId?: string;
+}
+
+export interface FamilyCalendarTimeSlot {
+    startTime: string;
+    endTime: string;
+    status: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
+    reservations: FamilyCalendarReservation[];
+}
+
+export interface FamilyCalendarResponse {
+    subscriptionId: string;
+    timeSlots: FamilyCalendarTimeSlot[];
+    familyMembers: Array<{
+        userId: number;
+        userName: string;
+        email: string;
+        role: string;
+        activeReservations: number;
+        upcomingReservations: number;
+    }>;
+    conflicts?: Array<{
+        conflictType: string;
+        message: string;
+        affectedReservations: string[];
+        severity: 'INFO' | 'WARNING' | 'CRITICAL';
+        suggestedAction?: string;
+    }>;
+}

@@ -16,7 +16,8 @@ import {
     LogOut,
     Menu,
     X,
-    Tag
+    Tag,
+    CreditCard
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from "../../shared/utils/cn";
@@ -73,6 +74,11 @@ const navigationItems = [
         title: 'Lockers',
         href: '/dashboard/lockers',
         icon: Lock,
+    },
+    {
+        title: 'Locker Subscriptions',
+        href: '/dashboard/locker-subscriptions',
+        icon: CreditCard,
     },
     {
         title: 'Settings',
