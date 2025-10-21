@@ -1,9 +1,20 @@
 // File: src/presentation/components/shop/providers/ProviderCard.tsx
 import { memo } from 'react';
 import {
-    Store, Star, Package, TrendingUp,
-    MoreVertical, Eye, Edit, Pause, Play,
-    DollarSign, Clock, RotateCcw, Users
+    Store,
+    Star,
+    Package,
+    TrendingUp,
+    MoreVertical,
+    Eye,
+    Edit,
+    Pause,
+    Play,
+    DollarSign,
+    Clock,
+    RotateCcw,
+    Users,
+    FolderTree,
 } from 'lucide-react';
 import { ProviderSummary } from '@/core/entities/ecommerce';
 
@@ -16,6 +27,7 @@ interface ProviderCardProps {
     onViewDetails: (id: string) => void;
     onEdit?: (id: string) => void;
     onToggleStatus?: (id: string) => void;
+    onManageCategories?: (id: string) => void;
     variant?: 'default' | 'compact' | 'detailed';
     isSelected?: boolean;
 }
@@ -26,6 +38,7 @@ export const ProviderCard = memo(function ProviderCard({
                                                            onViewDetails,
                                                            onEdit,
                                                            onToggleStatus,
+                                                           onManageCategories,
                                                            variant = 'default',
                                                            isSelected = false
                                                        }: ProviderCardProps) {
@@ -200,13 +213,34 @@ export const ProviderCard = memo(function ProviderCard({
 
             {/* Footer Actions */}
             <div className="px-6 pb-4">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {onManageCategories && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onManageCategories(provider.id);
+                            }}
+                            className={cn(
+                                'flex-1 min-w-[150px] px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                                'bg-white text-slate-700 border border-slate-200',
+                                'hover:border-blue-200 hover:text-blue-600 flex items-center justify-center gap-2'
+                            )}
+                            aria-label="Manage provider categories"
+                        >
+                            <FolderTree className="w-4 h-4" />
+                            Manage Categories
+                        </button>
+                    )}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onViewDetails(provider.id);
                         }}
-                        className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        className={cn(
+                            'flex-1 min-w-[150px] px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                            'bg-blue-600 text-white flex items-center justify-center gap-2',
+                            'hover:bg-blue-700'
+                        )}
                     >
                         <Eye className="w-4 h-4" />
                         View Products

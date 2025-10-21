@@ -12,6 +12,7 @@ interface ProviderGridProps {
     onViewDetails: (id: string) => void;
     onEdit?: (id: string) => void;
     onToggleStatus?: (id: string) => void;
+    onManageCategories?: (id: string) => void;
     variant?: 'default' | 'compact' | 'detailed';
     selectedIds?: string[];
     emptyMessage?: string;
@@ -24,6 +25,7 @@ export function ProviderGrid({
                                  onViewDetails,
                                  onEdit,
                                  onToggleStatus,
+                                 onManageCategories,
                                  variant = 'default',
                                  selectedIds = [],
                                  emptyMessage = "No providers found"
@@ -60,6 +62,7 @@ export function ProviderGrid({
                     onViewDetails={onViewDetails}
                     onEdit={onEdit}
                     onToggleStatus={onToggleStatus}
+                    onManageCategories={onManageCategories}
                     variant={variant}
                     isSelected={selectedIds.includes(provider.id)}
                 />

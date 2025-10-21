@@ -54,6 +54,10 @@ export default function EnhancedProvidersPage() {
         }
     }, [toggleStatusMutation]);
 
+    const handleManageCategories = useCallback((id: string) => {
+        router.push(`/dashboard/shop/providers/${id}/categories`);
+    }, [router]);
+
     const handleExport = useCallback(() => {
         // Implement export functionality
         console.log('Exporting providers...');
@@ -172,6 +176,7 @@ export default function EnhancedProvidersPage() {
                 onViewDetails={handleViewDetails}
                 onEdit={handleEdit}
                 onToggleStatus={handleToggleStatus}
+                onManageCategories={handleManageCategories}
                 variant={viewMode}
                 selectedIds={selectedProviders}
             />
