@@ -56,7 +56,26 @@ const DEFAULT_FILTERS: UserFilters = {
 
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
-    const [statistics, setStatistics] = useState<UserStatistics | null>(null);
+    const [statistics, setStatistics] = useState<UserStatistics>({
+        totalUsers: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        verifiedEmails: 0,
+        unverifiedEmails: 0,
+        verifiedPhones: 0,
+        twoFactorEnabled: 0,
+        lockedAccounts: 0,
+        usersByRole: {},
+        usersBySocialProvider: {},
+        registrationTrend: [],
+        loginActivity: { last24Hours: 0, last7Days: 0, last30Days: 0 },
+        newUsersToday: 0,
+        newUsersThisWeek: 0,
+        newUsersThisMonth: 0,
+        averageSessionDuration: "0",
+        topCountries: [],
+    });
+
     const [loading, setLoading] = useState<boolean>(true);
     const [statsLoading, setStatsLoading] = useState<boolean>(true);
     const [filters, setFilters] = useState<UserFilters>(DEFAULT_FILTERS);
@@ -465,7 +484,9 @@ export default function AdminUsersPage() {
                                 </div>
                                 <TrendingUp className="h-10 w-10 text-orange-500" />
                             </div>
-                            <p className="mt-3 text-sm text-gray-500">{statistics.loginActivity.last7Days} logins last 7 days</p>
+                            <p className="mt-3 text-sm text-gray-500">
+                                {statistics?.loginActivity?.last7Days ?? 0} logins last 7 days
+                            </p>
                         </div>
                     </div>
                 )

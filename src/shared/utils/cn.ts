@@ -99,12 +99,11 @@ export function isValidPhone(phone: string): boolean {
 }
 
 
-export function formatNumber(num: number): string {
-    if (num >= 1000000) {
-        return `${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-        return `${(num / 1000).toFixed(1)}K`;
-    }
-    return num.toString();
+export function formatNumber(num?: number | null): string {
+    if (num == null || isNaN(num)) return '0';
+
+    const abs = Math.abs(num);
+    if (abs >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+    return num.toLocaleString('en-US');
 }
