@@ -51,7 +51,7 @@ export interface CheckoutValidationResult {
     cartSummary: OrderCartSummary | null;
 }
 
-export interface LockerAvailabilityResult {
+export interface OrderLockerAvailabilityResult {
     isAvailable: boolean;
     lockerId: string;
     locationId: string;

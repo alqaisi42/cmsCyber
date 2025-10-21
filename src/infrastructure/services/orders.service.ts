@@ -17,7 +17,7 @@ import {
     LiveLocationInfo,
     LockerAccessRequest,
     LockerAvailabilityParams,
-    LockerAvailabilityResult,
+    OrderLockerAvailabilityResult,
     ManualStatusUpdateRequest,
     OrderActor,
     OrderBasicInfo,
@@ -124,7 +124,7 @@ class OrdersService {
         });
     }
 
-    checkLockerAvailability(params: LockerAvailabilityParams): Promise<ApiResponse<LockerAvailabilityResult>> {
+    checkLockerAvailability(params: LockerAvailabilityParams): Promise<ApiResponse<OrderLockerAvailabilityResult>> {
         const query = this.buildQuery(params);
         return this.request(`${this.checkoutUrl}/locker-availability?${query}`, {
             method: 'GET',

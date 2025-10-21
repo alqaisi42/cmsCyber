@@ -20,7 +20,7 @@ import {
     LiveLocationInfo,
     LockerAccessRequest,
     LockerAvailabilityParams,
-    LockerAvailabilityResult,
+    OrderLockerAvailabilityResult,
     ManualStatusUpdateRequest,
     OrderCompletionFeedback,
     OrderDetail,
