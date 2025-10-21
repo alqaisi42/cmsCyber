@@ -120,7 +120,7 @@ class OrdersService {
         const query = this.buildQuery({ userId });
         return this.request(`${this.checkoutUrl}/validate?${query}`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
@@ -141,7 +141,7 @@ class OrdersService {
     createOrder(payload: CreateOrderRequest): Promise<ApiResponse<OrderDetail>> {
         return this.request(`${this.checkoutUrl}/create-order`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
@@ -151,21 +151,21 @@ class OrdersService {
     vendorAcceptOrder(payload: VendorDecisionRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/workflow/vendor/accept`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
     vendorRejectOrder(payload: VendorDecisionRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/workflow/vendor/reject`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
     vendorProposeChanges(payload: VendorProposalRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/workflow/vendor/propose-changes`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
@@ -175,14 +175,14 @@ class OrdersService {
     userAcceptProposal(payload: UserProposalDecision): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/workflow/user/accept-proposal`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
     userRejectProposal(payload: UserProposalDecision): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/workflow/user/reject-proposal`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
@@ -234,14 +234,14 @@ class OrdersService {
     customerLockerAccess(orderId: string, userId: number, payload: LockerAccessRequest): Promise<ApiResponse<OrderLockerInfo>> {
         return this.request(`${this.baseUrl}/${orderId}/customer/locker/access?userId=${userId}`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
     completeOrder(orderId: string, userId: number, payload: OrderCompletionFeedback): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/${orderId}/complete?userId=${userId}`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
@@ -320,21 +320,21 @@ class OrdersService {
     updateOrderStatus(orderId: string, payload: UpdateOrderStatusRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/${orderId}/status`, {
             method: 'PUT',
-            body: payload,
+            body: payload as any,
         });
     }
 
     cancelOrder(orderId: string, payload: CancelOrderRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/${orderId}/cancel`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 
     assignDelivery(orderId: string, payload: AssignDeliveryRequest): Promise<ApiResponse<OrderBasicInfo>> {
         return this.request(`${this.baseUrl}/${orderId}/assign-delivery`, {
             method: 'POST',
-            body: payload,
+            body: payload as any,
         });
     }
 

@@ -1,7 +1,7 @@
 // src/app/dashboard/admin/orders/page.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import {useMemo, useState} from 'react';
 import {
     AlertTriangle,
     Calendar,
@@ -48,9 +48,9 @@ import {
     useVendorAccept,
     useVendorReject,
 } from '@/presentation/hooks/useOrders';
-import { StatsCard } from '@/presentation/components/ui/StatsCard';
-import { OrdersTable } from '@/presentation/components/orders/OrdersTable';
-import { OrderStatusBadge } from '@/presentation/components/orders/OrderStatusBadge';
+import {StatsCard} from '@/presentation/components/ui/StatsCard';
+import {OrdersTable} from '@/presentation/components/orders/OrdersTable';
+import {OrderStatusBadge} from '@/presentation/components/orders/OrderStatusBadge';
 import {
     AssignDeliveryRequest,
     CreateOrderRequest,
@@ -60,7 +60,7 @@ import {
     OrderStatus,
     UpdateOrderStatusRequest,
 } from '@/core/entities/orders';
-import { formatCurrency, formatDate } from '@/shared/utils/cn';
+import {formatCurrency, formatDate} from '@/shared/utils/cn';
 
 const ORDER_STATUSES: OrderStatus[] = [
     'REQUESTED',
@@ -78,12 +78,12 @@ const ORDER_STATUSES: OrderStatus[] = [
 ];
 
 const ADMIN_PERIODS = [
-    { value: 'LAST_7_DAYS', label: 'Last 7 days' },
-    { value: 'LAST_30_DAYS', label: 'Last 30 days' },
-    { value: 'LAST_90_DAYS', label: 'Last 90 days' },
-    { value: 'THIS_MONTH', label: 'This month' },
-    { value: 'LAST_MONTH', label: 'Last month' },
-    { value: 'ALL_TIME', label: 'All time' },
+    {value: 'LAST_7_DAYS', label: 'Last 7 days'},
+    {value: 'LAST_30_DAYS', label: 'Last 30 days'},
+    {value: 'LAST_90_DAYS', label: 'Last 90 days'},
+    {value: 'THIS_MONTH', label: 'This month'},
+    {value: 'LAST_MONTH', label: 'Last month'},
+    {value: 'ALL_TIME', label: 'All time'},
 ];
 
 interface ActionResultState {
@@ -92,10 +92,10 @@ interface ActionResultState {
 }
 
 function useActionFeedback(): [ActionResultState, (message: string) => void, (error: string) => void, () => void] {
-    const [state, setState] = useState<ActionResultState>({ message: null, error: null });
-    const setMessage = (message: string) => setState({ message, error: null });
-    const setError = (error: string) => setState({ message: null, error });
-    const clear = () => setState({ message: null, error: null });
+    const [state, setState] = useState<ActionResultState>({message: null, error: null});
+    const setMessage = (message: string) => setState({message, error: null});
+    const setError = (error: string) => setState({message: null, error});
+    const clear = () => setState({message: null, error: null});
     return [state, setMessage, setError, clear];
 }
 
@@ -142,7 +142,7 @@ export default function AdminOrdersPage() {
         const parsedMaxAmount = maxAmount ? Number(maxAmount) : undefined;
 
         return {
-            status: statusFilter || undefined,
+            status: (statusFilter as OrderStatus) || undefined,
             userId: parsedUserId && !Number.isNaN(parsedUserId) ? parsedUserId : undefined,
             vendorId: vendorIdFilter || undefined,
             createdFrom: dateFrom || undefined,
@@ -155,16 +155,16 @@ export default function AdminOrdersPage() {
         };
     }, [statusFilter, userIdFilter, vendorIdFilter, dateFrom, dateTo, minAmount, maxAmount, keyword, page, pageSize]);
 
-    const { data: stats } = useOrderStatistics();
-    const { data: adminStats } = useAdminOrderStatistics({ period });
-    const { data: attentionOrders } = useOrdersRequiringAttention();
-    const { data: searchResult, isLoading: searchLoading } = useOrderSearch(searchFilters, true);
+    const {data: stats} = useOrderStatistics();
+    const {data: adminStats} = useAdminOrderStatistics({period});
+    const {data: attentionOrders} = useOrdersRequiringAttention();
+    const {data: searchResult, isLoading: searchLoading} = useOrderSearch(searchFilters, true);
 
-    const { data: orderDetails, isLoading: detailsLoading } = useOrderDetails(selectedOrderId);
+    const {data: orderDetails, isLoading: detailsLoading} = useOrderDetails(selectedOrderId);
     const selectedUserId = orderDetails?.order.userId;
-    const { data: orderHistory, isLoading: historyLoading } = useOrderHistory(selectedOrderId, selectedUserId);
-    const { data: trackingInfo, isLoading: trackingLoading } = useOrderTracking(selectedOrderId, true);
-    const { data: liveLocation } = useLiveLocation(selectedOrderId, orderDetails?.order.status === 'IN_TRANSIT');
+    const {data: orderHistory, isLoading: historyLoading} = useOrderHistory(selectedOrderId, selectedUserId);
+    const {data: trackingInfo, isLoading: trackingLoading} = useOrderTracking(selectedOrderId, true);
+    const {data: liveLocation} = useLiveLocation(selectedOrderId, orderDetails?.order.status === 'IN_TRANSIT');
 
     const updateStatusMutation = useUpdateOrderStatus(selectedOrderId);
     const cancelOrderMutation = useCancelOrder(selectedOrderId);
@@ -246,7 +246,7 @@ export default function AdminOrdersPage() {
             return;
         }
         await handleAction(
-            async () => validateCheckoutMutation.mutateAsync({ userId }),
+            async () => validateCheckoutMutation.mutateAsync({userId}),
             'Checkout validated successfully'
         );
     };
@@ -278,7 +278,10 @@ export default function AdminOrdersPage() {
             return;
         }
         await handleAction(
-            async () => checkoutSummaryMutation.mutateAsync({ userId, promoCode: createOrderPayload.promoCode || undefined }),
+            async () => checkoutSummaryMutation.mutateAsync({
+                userId,
+                promoCode: createOrderPayload.promoCode || undefined
+            }),
             'Checkout summary calculated'
         );
     };
@@ -300,7 +303,7 @@ export default function AdminOrdersPage() {
             notes: notes || undefined,
         };
         await handleAction(
-            async () => assignDeliveryMutation.mutateAsync({ orderId: selectedOrderId, payload }),
+            async () => assignDeliveryMutation.mutateAsync({orderId: selectedOrderId, payload}),
             'Delivery person assigned'
         );
         event.currentTarget.reset();
@@ -324,7 +327,7 @@ export default function AdminOrdersPage() {
             userId: selectedUserId,
         };
         await handleAction(
-            async () => updateStatusMutation.mutateAsync({ orderId: selectedOrderId, payload }),
+            async () => updateStatusMutation.mutateAsync({orderId: selectedOrderId, payload}),
             'Order status updated'
         );
         event.currentTarget.reset();
@@ -347,7 +350,7 @@ export default function AdminOrdersPage() {
             reason: reason || undefined,
         };
         await handleAction(
-            async () => manualStatusMutation.mutateAsync({ orderId: selectedOrderId, payload }),
+            async () => manualStatusMutation.mutateAsync({orderId: selectedOrderId, payload}),
             'Order status manually updated'
         );
         event.currentTarget.reset();
@@ -363,9 +366,9 @@ export default function AdminOrdersPage() {
             setActionError('Provide both admin ID and reason to force cancel the order.');
             return;
         }
-        const payload: ForceCancelRequest = { adminId, reason };
+        const payload: ForceCancelRequest = {adminId, reason};
         await handleAction(
-            async () => forceCancelMutation.mutateAsync({ orderId: selectedOrderId, payload }),
+            async () => forceCancelMutation.mutateAsync({orderId: selectedOrderId, payload}),
             'Order force cancelled'
         );
         event.currentTarget.reset();
@@ -406,7 +409,7 @@ export default function AdminOrdersPage() {
             return;
         }
         await handleAction(
-            async () => mutation.mutateAsync({ orderId: selectedOrderId, deliveryPersonId }),
+            async () => mutation.mutateAsync({orderId: selectedOrderId, deliveryPersonId}),
             successMessage
         );
     };
@@ -442,7 +445,7 @@ export default function AdminOrdersPage() {
     const handleConfirmReceipt = async () => {
         if (!selectedOrderId || !selectedUserId) return;
         await handleAction(
-            async () => confirmReceiptMutation.mutateAsync({ orderId: selectedOrderId, userId: selectedUserId }),
+            async () => confirmReceiptMutation.mutateAsync({orderId: selectedOrderId, userId: selectedUserId}),
             'Receipt confirmed'
         );
     };
@@ -450,7 +453,7 @@ export default function AdminOrdersPage() {
     const selectedOrder = orderDetails?.order;
     const orders = searchResult?.orders ?? [];
     const totalPages = searchResult?.totalPages ?? 0;
-    const totalElements = searchResult?.totalElements ?? 0;
+    const totalElements = searchResult?.totalPages ?? 0;
 
     return (
         <div className="space-y-6">
@@ -458,11 +461,12 @@ export default function AdminOrdersPage() {
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-                            <ClipboardList className="w-8 h-8 text-blue-600" />
+                            <ClipboardList className="w-8 h-8 text-blue-600"/>
                             Order Operations Hub
                         </h1>
                         <p className="text-slate-600 max-w-2xl mt-2">
-                            Monitor every step of the order journey — from checkout validation to delivery confirmation. Quickly
+                            Monitor every step of the order journey — from checkout validation to delivery confirmation.
+                            Quickly
                             respond to issues, assist customers, and support providers in a single command center.
                         </p>
                     </div>
@@ -471,21 +475,21 @@ export default function AdminOrdersPage() {
                             onClick={() => setShowCreateModal(true)}
                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl shadow-sm hover:bg-blue-700 transition"
                         >
-                            <PackagePlus className="w-5 h-5" />
+                            <PackagePlus className="w-5 h-5"/>
                             New Order
                         </button>
                         <button
                             onClick={() => setShowFlowTools((prev) => !prev)}
                             className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50"
                         >
-                            <Layers className="w-5 h-5" />
+                            <Layers className="w-5 h-5"/>
                             Flow tools
                         </button>
                         <button
                             onClick={() => window.location.reload()}
                             className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50"
                         >
-                            <RefreshCw className="w-5 h-5" />
+                            <RefreshCw className="w-5 h-5"/>
                             Refresh
                         </button>
                     </div>
@@ -495,25 +499,25 @@ export default function AdminOrdersPage() {
                     <StatsCard
                         title="Total Orders"
                         value={stats?.totalOrders ?? 0}
-                        icon={<ClipboardList className="w-5 h-5" />}
+                        icon={<ClipboardList className="w-5 h-5"/>}
                         color="blue"
                     />
                     <StatsCard
                         title="Active Orders"
                         value={stats?.activeOrders ?? 0}
-                        icon={<Clock className="w-5 h-5" />}
+                        icon={<Clock className="w-5 h-5"/>}
                         color="purple"
                     />
                     <StatsCard
                         title="Completed"
                         value={stats?.completedOrders ?? 0}
-                        icon={<CheckCircle2 className="w-5 h-5" />}
+                        icon={<CheckCircle2 className="w-5 h-5"/>}
                         color="green"
                     />
                     <StatsCard
                         title="Revenue"
                         value={formatCurrency(stats?.totalRevenue ?? 0)}
-                        icon={<ShieldCheck className="w-5 h-5" />}
+                        icon={<ShieldCheck className="w-5 h-5"/>}
                         color="yellow"
                     />
                 </div>
@@ -522,16 +526,17 @@ export default function AdminOrdersPage() {
                     <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl p-5 shadow-md">
                         <p className="text-sm uppercase tracking-wide opacity-70">Admin insights</p>
                         <p className="text-3xl font-bold mt-2">{adminStats?.totalOrders ?? '—'}</p>
-                        <p className="text-sm opacity-80 mt-1">Orders in {ADMIN_PERIODS.find((p) => p.value === period)?.label.toLowerCase()}</p>
+                        <p className="text-sm opacity-80 mt-1">Orders
+                            in {ADMIN_PERIODS.find((p) => p.value === period)?.label.toLowerCase()}</p>
                         <div className="mt-4 flex items-center gap-2">
-                            <Users className="w-5 h-5" />
+                            <Users className="w-5 h-5"/>
                             <span className="text-sm">Customers: {adminStats?.customerCount ?? 0}</span>
                         </div>
                     </div>
                     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <h3 className="font-semibold text-slate-900">Orders requiring attention</h3>
-                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            <AlertTriangle className="w-5 h-5 text-amber-500"/>
                         </div>
                         <p className="text-sm text-slate-600">
                             {attentionOrders?.length ? `${attentionOrders.length} escalation${attentionOrders.length > 1 ? 's' : ''}` : 'No escalations right now'}
@@ -539,8 +544,9 @@ export default function AdminOrdersPage() {
                         {attentionOrders?.slice(0, 2).map((order) => (
                             <div key={order.id} className="border border-amber-200 rounded-xl px-3 py-2 bg-amber-50/70">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className="font-semibold text-amber-700">{order.issueType.replaceAll('_', ' ')}</span>
-                                    <OrderStatusBadge status={order.status} />
+                                    <span
+                                        className="font-semibold text-amber-700">{order.issueType.replaceAll('_', ' ')}</span>
+                                    <OrderStatusBadge status={order.status}/>
                                 </div>
                                 <p className="text-xs text-amber-700 mt-1 line-clamp-2">{order.issueDescription}</p>
                             </div>
@@ -566,7 +572,7 @@ export default function AdminOrdersPage() {
                             <div className="mt-3 space-y-2 text-sm">
                                 <p className="font-semibold">Order {selectedOrderId.slice(0, 8)}</p>
                                 <p className="flex items-center gap-2 opacity-80">
-                                    <Truck className="w-4 h-4" />
+                                    <Truck className="w-4 h-4"/>
                                     {trackingInfo?.currentStatus ?? 'Loading...'}
                                 </p>
                                 {liveLocation?.currentLocation && (
@@ -589,7 +595,7 @@ export default function AdminOrdersPage() {
                     <div>
                         <label className="text-xs font-semibold text-slate-500 uppercase">Keyword</label>
                         <div className="relative mt-2">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
                             <input
                                 value={keyword}
                                 onChange={(event) => setKeyword(event.target.value)}
@@ -602,10 +608,7 @@ export default function AdminOrdersPage() {
                         <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
                         <select
                             value={statusFilter}
-                            onChange={(event) => {
-                                setStatusFilter(event.target.value);
-                                resetPagination();
-                            }}
+                            onChange={(event) => setStatusFilter(event.target.value as OrderStatus)}
                             className="mt-2 w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">All statuses</option>
@@ -615,6 +618,7 @@ export default function AdminOrdersPage() {
                                 </option>
                             ))}
                         </select>
+
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-slate-500 uppercase">User ID</label>
@@ -675,7 +679,7 @@ export default function AdminOrdersPage() {
                             type="submit"
                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
                         >
-                            <Filter className="w-4 h-4" />
+                            <Filter className="w-4 h-4"/>
                             Apply filters
                         </button>
                         <button
@@ -722,15 +726,17 @@ export default function AdminOrdersPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-xl font-semibold text-slate-900">Checkout & workflow tools</h2>
-                            <p className="text-sm text-slate-600">Use these utilities to simulate or assist user/provider actions.</p>
+                            <p className="text-sm text-slate-600">Use these utilities to simulate or assist
+                                user/provider actions.</p>
                         </div>
                         <button onClick={() => setShowFlowTools(false)} className="text-slate-500 hover:text-slate-700">
-                            <X className="w-5 h-5" />
+                            <X className="w-5 h-5"/>
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <form onSubmit={handleValidateCheckout} className="border border-slate-200 rounded-2xl p-4 space-y-4">
+                        <form onSubmit={handleValidateCheckout}
+                              className="border border-slate-200 rounded-2xl p-4 space-y-4">
                             <h3 className="text-sm font-semibold text-slate-900 uppercase">Validate checkout</h3>
                             <div>
                                 <label className="text-xs text-slate-500 uppercase">User ID</label>
@@ -745,11 +751,12 @@ export default function AdminOrdersPage() {
                                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 disabled={validateCheckoutMutation.isPending}
                             >
-                                {validateCheckoutMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {validateCheckoutMutation.isPending && <Loader2 className="w-4 h-4 animate-spin"/>}
                                 Validate
                             </button>
                             {validateCheckoutMutation.data && (
-                                <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div
+                                    className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
                                     <p>Valid: {validateCheckoutMutation.data.data.isValid ? 'Yes' : 'No'}</p>
                                     {validateCheckoutMutation.data.data.issues?.length > 0 && (
                                         <ul className="list-disc ml-4 mt-2 space-y-1">
@@ -762,14 +769,19 @@ export default function AdminOrdersPage() {
                             )}
                         </form>
 
-                        <form onSubmit={handleLockerAvailability} className="border border-slate-200 rounded-2xl p-4 space-y-4">
-                            <h3 className="text-sm font-semibold text-slate-900 uppercase">Check locker availability</h3>
+                        <form onSubmit={handleLockerAvailability}
+                              className="border border-slate-200 rounded-2xl p-4 space-y-4">
+                            <h3 className="text-sm font-semibold text-slate-900 uppercase">Check locker
+                                availability</h3>
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="text-xs text-slate-500 uppercase">User ID</label>
                                     <input
                                         value={lockerParams.userId}
-                                        onChange={(event) => setLockerParams((prev) => ({ ...prev, userId: event.target.value }))}
+                                        onChange={(event) => setLockerParams((prev) => ({
+                                            ...prev,
+                                            userId: event.target.value
+                                        }))}
                                         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
@@ -777,7 +789,10 @@ export default function AdminOrdersPage() {
                                     <label className="text-xs text-slate-500 uppercase">Location ID</label>
                                     <input
                                         value={lockerParams.locationId}
-                                        onChange={(event) => setLockerParams((prev) => ({ ...prev, locationId: event.target.value }))}
+                                        onChange={(event) => setLockerParams((prev) => ({
+                                            ...prev,
+                                            locationId: event.target.value
+                                        }))}
                                         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
@@ -785,7 +800,10 @@ export default function AdminOrdersPage() {
                                     <label className="text-xs text-slate-500 uppercase">Locker ID</label>
                                     <input
                                         value={lockerParams.lockerId}
-                                        onChange={(event) => setLockerParams((prev) => ({ ...prev, lockerId: event.target.value }))}
+                                        onChange={(event) => setLockerParams((prev) => ({
+                                            ...prev,
+                                            lockerId: event.target.value
+                                        }))}
                                         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
@@ -794,7 +812,10 @@ export default function AdminOrdersPage() {
                                     <input
                                         type="datetime-local"
                                         value={lockerParams.deliveryTime}
-                                        onChange={(event) => setLockerParams((prev) => ({ ...prev, deliveryTime: event.target.value }))}
+                                        onChange={(event) => setLockerParams((prev) => ({
+                                            ...prev,
+                                            deliveryTime: event.target.value
+                                        }))}
                                         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
@@ -802,7 +823,10 @@ export default function AdminOrdersPage() {
                                     <label className="text-xs text-slate-500 uppercase">Required size</label>
                                     <select
                                         value={lockerParams.requiredSize}
-                                        onChange={(event) => setLockerParams((prev) => ({ ...prev, requiredSize: event.target.value }))}
+                                        onChange={(event) => setLockerParams((prev) => ({
+                                            ...prev,
+                                            requiredSize: event.target.value
+                                        }))}
                                         className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="SMALL">Small</option>
@@ -816,11 +840,12 @@ export default function AdminOrdersPage() {
                                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 disabled={lockerAvailabilityMutation.isPending}
                             >
-                                {lockerAvailabilityMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {lockerAvailabilityMutation.isPending && <Loader2 className="w-4 h-4 animate-spin"/>}
                                 Check availability
                             </button>
                             {lockerAvailabilityMutation.data && (
-                                <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div
+                                    className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
                                     <p>Available: {lockerAvailabilityMutation.data.data.isAvailable ? 'Yes' : 'No'}</p>
                                     {lockerAvailabilityMutation.data.data.reason && (
                                         <p className="mt-1">Reason: {lockerAvailabilityMutation.data.data.reason}</p>
@@ -829,7 +854,8 @@ export default function AdminOrdersPage() {
                             )}
                         </form>
 
-                        <form onSubmit={handleCheckoutSummary} className="border border-slate-200 rounded-2xl p-4 space-y-4">
+                        <form onSubmit={handleCheckoutSummary}
+                              className="border border-slate-200 rounded-2xl p-4 space-y-4">
                             <h3 className="text-sm font-semibold text-slate-900 uppercase">Checkout summary</h3>
                             <p className="text-xs text-slate-500">Uses the same user ID as validation.</p>
                             <button
@@ -837,11 +863,12 @@ export default function AdminOrdersPage() {
                                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 disabled={checkoutSummaryMutation.isPending}
                             >
-                                {checkoutSummaryMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {checkoutSummaryMutation.isPending && <Loader2 className="w-4 h-4 animate-spin"/>}
                                 Get summary
                             </button>
                             {checkoutSummaryMutation.data && (
-                                <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
+                                <div
+                                    className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
                                     <p>Items: {checkoutSummaryMutation.data.data.itemCount}</p>
                                     <p>Subtotal: {formatCurrency(checkoutSummaryMutation.data.data.subtotal)}</p>
                                     <p>Total: {formatCurrency(checkoutSummaryMutation.data.data.totalAmount)}</p>
@@ -859,427 +886,476 @@ export default function AdminOrdersPage() {
                             className="w-full max-w-4xl h-full bg-white shadow-2xl overflow-y-auto"
                             onClick={(event) => event.stopPropagation()}
                         >
-                        <div className="p-6 border-b border-slate-200 flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-wide text-slate-500">Order details</p>
-                                <h2 className="text-2xl font-bold text-slate-900 mt-1 flex items-center gap-3">
-                                    #{selectedOrder.id?.slice(0, 8)}
-                                    <OrderStatusBadge status={selectedOrder.status} />
-                                </h2>
-                                <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-4">
+                            <div className="p-6 border-b border-slate-200 flex items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Order details</p>
+                                    <h2 className="text-2xl font-bold text-slate-900 mt-1 flex items-center gap-3">
+                                        #{selectedOrder.id?.slice(0, 8)}
+                                        <OrderStatusBadge status={selectedOrder.status}/>
+                                    </h2>
+                                    <div className="text-sm text-slate-500 mt-2 flex flex-wrap gap-4">
                                     <span className="flex items-center gap-2">
-                                        <Calendar className="w-4 h-4" />
+                                        <Calendar className="w-4 h-4"/>
                                         {formatDate(selectedOrder.createdAt ?? new Date(), 'time')}
                                     </span>
-                                    {selectedOrder.deliveryAddress && (
-                                        <span className="flex items-center gap-2">
-                                            <MapPin className="w-4 h-4" />
-                                            {selectedOrder.deliveryAddress}
+                                        {selectedOrder.deliveryAddress && (
+                                            <span className="flex items-center gap-2">
+                                            <MapPin className="w-4 h-4"/>
+                                                {selectedOrder.deliveryAddress}
                                         </span>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
+                                <button onClick={onCloseDetails} className="text-slate-500 hover:text-slate-700">
+                                    <X className="w-6 h-6"/>
+                                </button>
                             </div>
-                            <button onClick={onCloseDetails} className="text-slate-500 hover:text-slate-700">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
 
-                        <div className="p-6 space-y-6">
-                            {actionState.message && (
-                                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                                    {actionState.message}
-                                </div>
-                            )}
-                            {actionState.error && (
-                                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                    {actionState.error}
-                                </div>
-                            )}
-
-                            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
-                                    <h3 className="text-sm font-semibold text-slate-900 uppercase">Financial summary</h3>
-                                    <p className="text-2xl font-bold text-slate-900">{formatCurrency(selectedOrder.totalAmount)}</p>
-                                    <div className="text-sm text-slate-600 space-y-1">
-                                        {selectedOrder.subtotal !== undefined && (
-                                            <p>Subtotal: {formatCurrency(selectedOrder.subtotal)}</p>
-                                        )}
-                                        {selectedOrder.taxAmount !== undefined && (
-                                            <p>Tax: {formatCurrency(selectedOrder.taxAmount)}</p>
-                                        )}
-                                        {selectedOrder.deliveryFee !== undefined && (
-                                            <p>Delivery fee: {formatCurrency(selectedOrder.deliveryFee)}</p>
-                                        )}
-                                        {selectedOrder.discountAmount !== undefined && selectedOrder.discountAmount > 0 && (
-                                            <p>Discount: -{formatCurrency(selectedOrder.discountAmount)}</p>
-                                        )}
-                                        <p className="pt-2 text-xs uppercase text-slate-400">Payment status: {selectedOrder.paymentStatus}</p>
+                            <div className="p-6 space-y-6">
+                                {actionState.message && (
+                                    <div
+                                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                                        {actionState.message}
                                     </div>
-                                </div>
-                                <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
-                                    <h3 className="text-sm font-semibold text-slate-900 uppercase">Participants</h3>
-                                    <div className="text-sm text-slate-600 space-y-2">
-                                        <p className="font-semibold text-slate-900">Customer</p>
-                                        <p>{selectedOrder.userName ?? `User #${selectedOrder.userId}`}</p>
-                                        <p className="font-semibold text-slate-900 pt-2">Vendor</p>
-                                        <p>{selectedOrder.vendorName ?? selectedOrder.vendorId}</p>
-                                        {selectedOrder.deliveryPersonId && (
-                                            <p className="pt-2 text-sm">Delivery person: {selectedOrder.deliveryPersonId}</p>
-                                        )}
+                                )}
+                                {actionState.error && (
+                                    <div
+                                        className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                        {actionState.error}
                                     </div>
-                                </div>
-                            </section>
+                                )}
 
-                            <section className="border border-slate-200 rounded-2xl p-4">
-                                <h3 className="text-sm font-semibold text-slate-900 uppercase mb-4">Items</h3>
-                                <div className="space-y-3">
-                                    {orderDetails?.items.map((item) => (
-                                        <div
-                                            key={`${item.productId}-${item.productName}`}
-                                            className="flex items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3"
-                                        >
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900">{item.productName}</p>
-                                                <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
-                                            </div>
-                                            <div className="text-right text-sm text-slate-600">
-                                                <p>{formatCurrency(item.unitPrice)} ea</p>
-                                                <p className="font-semibold text-slate-900">{formatCurrency(item.totalPrice)}</p>
-                                            </div>
+                                <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+                                        <h3 className="text-sm font-semibold text-slate-900 uppercase">Financial
+                                            summary</h3>
+                                        <p className="text-2xl font-bold text-slate-900">{formatCurrency(selectedOrder.totalAmount)}</p>
+                                        <div className="text-sm text-slate-600 space-y-1">
+                                            {selectedOrder.subtotal !== undefined && (
+                                                <p>Subtotal: {formatCurrency(selectedOrder.subtotal)}</p>
+                                            )}
+                                            {selectedOrder.taxAmount !== undefined && (
+                                                <p>Tax: {formatCurrency(selectedOrder.taxAmount)}</p>
+                                            )}
+                                            {selectedOrder.deliveryFee !== undefined && (
+                                                <p>Delivery fee: {formatCurrency(selectedOrder.deliveryFee)}</p>
+                                            )}
+                                            {selectedOrder.discountAmount !== undefined && selectedOrder.discountAmount > 0 && (
+                                                <p>Discount: -{formatCurrency(selectedOrder.discountAmount)}</p>
+                                            )}
+                                            <p className="pt-2 text-xs uppercase text-slate-400">Payment
+                                                status: {selectedOrder.paymentStatus}</p>
                                         </div>
-                                    ))}
-                                </div>
-                            </section>
+                                    </div>
+                                    <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+                                        <h3 className="text-sm font-semibold text-slate-900 uppercase">Participants</h3>
+                                        <div className="text-sm text-slate-600 space-y-2">
+                                            <p className="font-semibold text-slate-900">Customer</p>
+                                            <p>{selectedOrder.userName ?? `User #${selectedOrder.userId}`}</p>
+                                            <p className="font-semibold text-slate-900 pt-2">Vendor</p>
+                                            <p>{selectedOrder.vendorName ?? selectedOrder.vendorId}</p>
+                                            {selectedOrder.deliveryPersonId && (
+                                                <p className="pt-2 text-sm">Delivery
+                                                    person: {selectedOrder.deliveryPersonId}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
 
-                            <section className="border border-slate-200 rounded-2xl p-4">
-                                <h3 className="text-sm font-semibold text-slate-900 uppercase mb-4">Timeline</h3>
-                                <div className="space-y-4">
-                                    {trackingLoading && (
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Loading timeline...
-                                        </div>
-                                    )}
-                                    {!trackingLoading && trackingInfo?.timeline?.map((entry) => (
-                                        <div key={`${entry.status}-${entry.timestamp}`} className="flex items-start gap-3">
-                                            <div className="mt-1">
-                                                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                <section className="border border-slate-200 rounded-2xl p-4">
+                                    <h3 className="text-sm font-semibold text-slate-900 uppercase mb-4">Items</h3>
+                                    <div className="space-y-3">
+                                        {orderDetails?.items.map((item) => (
+                                            <div
+                                                key={`${item.productId}-${item.productName}`}
+                                                className="flex items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3"
+                                            >
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">{item.productName}</p>
+                                                    <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
+                                                </div>
+                                                <div className="text-right text-sm text-slate-600">
+                                                    <p>{formatCurrency(item.unitPrice)} ea</p>
+                                                    <p className="font-semibold text-slate-900">{formatCurrency(item.totalPrice)}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900">{entry.status.replaceAll('_', ' ')}</p>
-                                                <p className="text-xs text-slate-500">{formatDate(entry.timestamp, 'time')}</p>
-                                                {entry.description && <p className="text-xs text-slate-600 mt-1">{entry.description}</p>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {historyLoading && (
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Loading history...
-                                        </div>
-                                    )}
-                                    {!historyLoading && orderHistory?.map((entry) => (
-                                        <div key={`${entry.status}-${entry.timestamp}-history`} className="flex items-start gap-3">
-                                            <div className="mt-1">
-                                                <div className="h-2 w-2 rounded-full bg-slate-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-900">{entry.status.replaceAll('_', ' ')}</p>
-                                                <p className="text-xs text-slate-500">{formatDate(entry.timestamp, 'time')}</p>
-                                                {entry.notes && <p className="text-xs text-slate-600 mt-1">{entry.notes}</p>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
+                                        ))}
+                                    </div>
+                                </section>
 
-                            <section className="border border-slate-200 rounded-2xl p-4 space-y-6">
-                                <h3 className="text-sm font-semibold text-slate-900 uppercase">Admin actions</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <form onSubmit={handleStatusUpdate} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Update status</p>
-                                        <select
-                                            name="status"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>
-                                                Select status
-                                            </option>
-                                            {ORDER_STATUSES.map((status) => (
-                                                <option key={status} value={status}>
-                                                    {status.replaceAll('_', ' ')}
+                                <section className="border border-slate-200 rounded-2xl p-4">
+                                    <h3 className="text-sm font-semibold text-slate-900 uppercase mb-4">Timeline</h3>
+                                    <div className="space-y-4">
+                                        {trackingLoading && (
+                                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                                <Loader2 className="w-4 h-4 animate-spin"/>
+                                                Loading timeline...
+                                            </div>
+                                        )}
+                                        {!trackingLoading && trackingInfo?.timeline?.map((entry) => (
+                                            <div key={`${entry.status}-${entry.timestamp}`}
+                                                 className="flex items-start gap-3">
+                                                <div className="mt-1">
+                                                    <div className="h-2 w-2 rounded-full bg-blue-500"/>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">{entry.status.replaceAll('_', ' ')}</p>
+                                                    <p className="text-xs text-slate-500">{formatDate(entry.timestamp, 'time')}</p>
+                                                    {entry.description &&
+                                                        <p className="text-xs text-slate-600 mt-1">{entry.description}</p>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {historyLoading && (
+                                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                                <Loader2 className="w-4 h-4 animate-spin"/>
+                                                Loading history...
+                                            </div>
+                                        )}
+                                        {!historyLoading && orderHistory?.map((entry) => (
+                                            <div key={`${entry.status}-${entry.timestamp}-history`}
+                                                 className="flex items-start gap-3">
+                                                <div className="mt-1">
+                                                    <div className="h-2 w-2 rounded-full bg-slate-400"/>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900">{entry.status.replaceAll('_', ' ')}</p>
+                                                    <p className="text-xs text-slate-500">{formatDate(entry.timestamp, 'time')}</p>
+                                                    {entry.notes &&
+                                                        <p className="text-xs text-slate-600 mt-1">{entry.notes}</p>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section className="border border-slate-200 rounded-2xl p-4 space-y-6">
+                                    <h3 className="text-sm font-semibold text-slate-900 uppercase">Admin actions</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <form onSubmit={handleStatusUpdate}
+                                              className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Update
+                                                status</p>
+                                            <select
+                                                name="status"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                defaultValue=""
+                                            >
+                                                <option value="" disabled>
+                                                    Select status
                                                 </option>
-                                            ))}
-                                        </select>
-                                        <input
-                                            name="updatedBy"
-                                            defaultValue="ADMIN"
-                                            placeholder="Updated by"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <textarea
-                                            name="reason"
-                                            placeholder="Reason (optional)"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                            disabled={updateStatusMutation.isPending}
-                                        >
-                                            {updateStatusMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Update status
-                                        </button>
-                                    </form>
-
-                                    <form onSubmit={handleManualStatusUpdate} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Manual override</p>
-                                        <select
-                                            name="newStatus"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>
-                                                Select status
-                                            </option>
-                                            {ORDER_STATUSES.map((status) => (
-                                                <option key={status} value={status}>
-                                                    {status.replaceAll('_', ' ')}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <input
-                                            name="adminId"
-                                            placeholder="Admin ID"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <textarea
-                                            name="reason"
-                                            placeholder="Reason"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-                                            disabled={manualStatusMutation.isPending}
-                                        >
-                                            {manualStatusMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Manual update
-                                        </button>
-                                    </form>
-
-                                    <form onSubmit={handleAssignDelivery} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Assign delivery</p>
-                                        <input
-                                            name="deliveryPersonId"
-                                            placeholder="Delivery person ID"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            name="assignedBy"
-                                            placeholder="Assigned by"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <textarea
-                                            name="notes"
-                                            placeholder="Notes"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                            disabled={assignDeliveryMutation.isPending}
-                                        >
-                                            {assignDeliveryMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Assign
-                                        </button>
-                                    </form>
-
-                                    <form onSubmit={handleForceCancel} className="border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-rose-600 uppercase">Force cancel</p>
-                                        <input
-                                            name="adminId"
-                                            placeholder="Admin ID"
-                                            className="w-full border border-rose-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400"
-                                        />
-                                        <textarea
-                                            name="reason"
-                                            placeholder="Reason"
-                                            className="w-full border border-rose-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700"
-                                            disabled={forceCancelMutation.isPending}
-                                        >
-                                            {forceCancelMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Force cancel
-                                        </button>
-                                    </form>
-
-                                    <form onSubmit={handleCancelOrder} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Standard cancel</p>
-                                        <textarea
-                                            name="reason"
-                                            placeholder="Reason"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            name="cancelledBy"
-                                            defaultValue="ADMIN"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900"
-                                            disabled={cancelOrderMutation.isPending}
-                                        >
-                                            {cancelOrderMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Cancel order
-                                        </button>
-                                    </form>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Delivery actions</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDeliveryAction(confirmPickupMutation, selectedOrder.deliveryPersonId ?? 0, 'Pickup confirmed')}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={confirmPickupMutation.isPending}
-                                            >
-                                                {confirmPickupMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                Confirm pickup
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDeliveryAction(startDeliveryMutation, selectedOrder.deliveryPersonId ?? 0, 'Delivery started')}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={startDeliveryMutation.isPending}
-                                            >
-                                                {startDeliveryMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                Start delivery
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDeliveryAction(markDeliveredMutation, selectedOrder.deliveryPersonId ?? 0, 'Marked as delivered')}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={markDeliveredMutation.isPending}
-                                            >
-                                                {markDeliveredMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                Mark delivered
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Vendor simulation</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction(
-                                                    () => vendorStartPrepMutation.mutateAsync({ orderId: selectedOrderId!, vendorId: selectedOrder.vendorId }),
-                                                    'Preparation started'
-                                                )}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={vendorStartPrepMutation.isPending}
-                                            >
-                                                {vendorStartPrepMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                Start prep
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction(
-                                                    () => vendorReadyMutation.mutateAsync({ orderId: selectedOrderId!, vendorId: selectedOrder.vendorId }),
-                                                    'Marked ready'
-                                                )}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={vendorReadyMutation.isPending}
-                                            >
-                                                {vendorReadyMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                Ready for delivery
-                                            </button>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction(
-                                                    () => vendorAcceptMutation.mutateAsync({ orderId: selectedOrderId!, vendorId: selectedOrder.vendorId }),
-                                                    'Vendor accepted order'
-                                                )}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={vendorAcceptMutation.isPending}
-                                            >
-                                                Accept
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction(
-                                                    () => vendorRejectMutation.mutateAsync({ orderId: selectedOrderId!, vendorId: selectedOrder.vendorId, reason: 'Admin trigger' }),
-                                                    'Vendor rejected order'
-                                                )}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                                                disabled={vendorRejectMutation.isPending}
-                                            >
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <form onSubmit={handleCompleteOrder} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Complete order & feedback</p>
-                                        <div className="grid grid-cols-2 gap-3">
+                                                {ORDER_STATUSES.map((status) => (
+                                                    <option key={status} value={status}>
+                                                        {status.replaceAll('_', ' ')}
+                                                    </option>
+                                                ))}
+                                            </select>
                                             <input
-                                                name="vendorRating"
-                                                type="number"
-                                                min={1}
-                                                max={5}
-                                                placeholder="Vendor rating"
-                                                className="border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                name="updatedBy"
+                                                defaultValue="ADMIN"
+                                                placeholder="Updated by"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <textarea
+                                                name="reason"
+                                                placeholder="Reason (optional)"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                disabled={updateStatusMutation.isPending}
+                                            >
+                                                {updateStatusMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Update status
+                                            </button>
+                                        </form>
+
+                                        <form onSubmit={handleManualStatusUpdate}
+                                              className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Manual
+                                                override</p>
+                                            <select
+                                                name="newStatus"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                defaultValue=""
+                                            >
+                                                <option value="" disabled>
+                                                    Select status
+                                                </option>
+                                                {ORDER_STATUSES.map((status) => (
+                                                    <option key={status} value={status}>
+                                                        {status.replaceAll('_', ' ')}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <input
+                                                name="adminId"
+                                                placeholder="Admin ID"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <textarea
+                                                name="reason"
+                                                placeholder="Reason"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                                                disabled={manualStatusMutation.isPending}
+                                            >
+                                                {manualStatusMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Manual update
+                                            </button>
+                                        </form>
+
+                                        <form onSubmit={handleAssignDelivery}
+                                              className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Assign
+                                                delivery</p>
+                                            <input
+                                                name="deliveryPersonId"
+                                                placeholder="Delivery person ID"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                             <input
-                                                name="deliveryRating"
-                                                type="number"
-                                                min={1}
-                                                max={5}
-                                                placeholder="Delivery rating"
-                                                className="border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                name="assignedBy"
+                                                placeholder="Assigned by"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
-                                        </div>
-                                        <textarea
-                                            name="comment"
-                                            placeholder="Feedback"
-                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                            disabled={completeOrderMutation.isPending}
-                                        >
-                                            {completeOrderMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Complete order
-                                        </button>
-                                    </form>
-                                    <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                        <p className="text-xs font-semibold text-slate-500 uppercase">Customer receipt</p>
-                                        <button
-                                            type="button"
-                                            onClick={handleConfirmReceipt}
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-                                            disabled={confirmReceiptMutation.isPending}
-                                        >
-                                            {confirmReceiptMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                            Confirm receipt
-                                        </button>
+                                            <textarea
+                                                name="notes"
+                                                placeholder="Notes"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                disabled={assignDeliveryMutation.isPending}
+                                            >
+                                                {assignDeliveryMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Assign
+                                            </button>
+                                        </form>
+
+                                        <form onSubmit={handleForceCancel}
+                                              className="border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-rose-600 uppercase">Force
+                                                cancel</p>
+                                            <input
+                                                name="adminId"
+                                                placeholder="Admin ID"
+                                                className="w-full border border-rose-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                                            />
+                                            <textarea
+                                                name="reason"
+                                                placeholder="Reason"
+                                                className="w-full border border-rose-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700"
+                                                disabled={forceCancelMutation.isPending}
+                                            >
+                                                {forceCancelMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Force cancel
+                                            </button>
+                                        </form>
+
+                                        <form onSubmit={handleCancelOrder}
+                                              className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Standard
+                                                cancel</p>
+                                            <textarea
+                                                name="reason"
+                                                placeholder="Reason"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <input
+                                                name="cancelledBy"
+                                                defaultValue="ADMIN"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900"
+                                                disabled={cancelOrderMutation.isPending}
+                                            >
+                                                {cancelOrderMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Cancel order
+                                            </button>
+                                        </form>
                                     </div>
-                                </div>
-                            </section>
-                        </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Delivery
+                                                actions</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDeliveryAction(confirmPickupMutation, selectedOrder.deliveryPersonId ?? 0, 'Pickup confirmed')}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={confirmPickupMutation.isPending}
+                                                >
+                                                    {confirmPickupMutation.isPending &&
+                                                        <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                    Confirm pickup
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDeliveryAction(startDeliveryMutation, selectedOrder.deliveryPersonId ?? 0, 'Delivery started')}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={startDeliveryMutation.isPending}
+                                                >
+                                                    {startDeliveryMutation.isPending &&
+                                                        <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                    Start delivery
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDeliveryAction(markDeliveredMutation, selectedOrder.deliveryPersonId ?? 0, 'Marked as delivered')}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={markDeliveredMutation.isPending}
+                                                >
+                                                    {markDeliveredMutation.isPending &&
+                                                        <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                    Mark delivered
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Vendor
+                                                simulation</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction(
+                                                        () => vendorStartPrepMutation.mutateAsync({
+                                                            orderId: selectedOrderId!,
+                                                            vendorId: selectedOrder.vendorId
+                                                        }),
+                                                        'Preparation started'
+                                                    )}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={vendorStartPrepMutation.isPending}
+                                                >
+                                                    {vendorStartPrepMutation.isPending &&
+                                                        <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                    Start prep
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction(
+                                                        () => vendorReadyMutation.mutateAsync({
+                                                            orderId: selectedOrderId!,
+                                                            vendorId: selectedOrder.vendorId
+                                                        }),
+                                                        'Marked ready'
+                                                    )}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={vendorReadyMutation.isPending}
+                                                >
+                                                    {vendorReadyMutation.isPending &&
+                                                        <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                    Ready for delivery
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction(
+                                                        () => vendorAcceptMutation.mutateAsync({
+                                                            orderId: selectedOrderId!,
+                                                            vendorId: selectedOrder.vendorId
+                                                        }),
+                                                        'Vendor accepted order'
+                                                    )}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={vendorAcceptMutation.isPending}
+                                                >
+                                                    Accept
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction(
+                                                        () => vendorRejectMutation.mutateAsync({
+                                                            orderId: selectedOrderId!,
+                                                            vendorId: selectedOrder.vendorId,
+                                                            reason: 'Admin trigger'
+                                                        }),
+                                                        'Vendor rejected order'
+                                                    )}
+                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                                                    disabled={vendorRejectMutation.isPending}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <form onSubmit={handleCompleteOrder}
+                                              className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Complete order
+                                                & feedback</p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input
+                                                    name="vendorRating"
+                                                    type="number"
+                                                    min={1}
+                                                    max={5}
+                                                    placeholder="Vendor rating"
+                                                    className="border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                                <input
+                                                    name="deliveryRating"
+                                                    type="number"
+                                                    min={1}
+                                                    max={5}
+                                                    placeholder="Delivery rating"
+                                                    className="border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <textarea
+                                                name="comment"
+                                                placeholder="Feedback"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                disabled={completeOrderMutation.isPending}
+                                            >
+                                                {completeOrderMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Complete order
+                                            </button>
+                                        </form>
+                                        <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Customer
+                                                receipt</p>
+                                            <button
+                                                type="button"
+                                                onClick={handleConfirmReceipt}
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                                                disabled={confirmReceiptMutation.isPending}
+                                            >
+                                                {confirmReceiptMutation.isPending &&
+                                                    <Loader2 className="w-4 h-4 animate-spin"/>}
+                                                Confirm receipt
+                                            </button>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
                         </div>
                     ) : (
                         <div
@@ -1287,7 +1363,7 @@ export default function AdminOrdersPage() {
                             onClick={(event) => event.stopPropagation()}
                         >
                             <div className="flex flex-col items-center gap-3 text-slate-500">
-                                <Loader2 className="w-6 h-6 animate-spin" />
+                                <Loader2 className="w-6 h-6 animate-spin"/>
                                 <p className="text-sm">Loading order details...</p>
                             </div>
                         </div>
@@ -1295,15 +1371,17 @@ export default function AdminOrdersPage() {
                 </div>
             )}
             {showCreateModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60" onClick={() => setShowCreateModal(false)}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60"
+                     onClick={() => setShowCreateModal(false)}>
                     <div
                         className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 space-y-4"
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-semibold text-slate-900">Create order</h2>
-                            <button onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-slate-700">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setShowCreateModal(false)}
+                                    className="text-slate-500 hover:text-slate-700">
+                                <X className="w-5 h-5"/>
                             </button>
                         </div>
                         <form onSubmit={handleCreateOrderSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1311,7 +1389,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">User ID</label>
                                 <input
                                     value={createOrderPayload.userId || ''}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, userId: Number(event.target.value) }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        userId: Number(event.target.value)
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1319,7 +1400,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Vendor ID</label>
                                 <input
                                     value={createOrderPayload.vendorId}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, vendorId: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        vendorId: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1327,7 +1411,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Location ID</label>
                                 <input
                                     value={createOrderPayload.locationId}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, locationId: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        locationId: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1335,7 +1422,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Locker ID</label>
                                 <input
                                     value={createOrderPayload.lockerId}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, lockerId: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        lockerId: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1344,7 +1434,10 @@ export default function AdminOrdersPage() {
                                 <input
                                     type="datetime-local"
                                     value={createOrderPayload.deliveryTime}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, deliveryTime: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        deliveryTime: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1352,7 +1445,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Payment method</label>
                                 <select
                                     value={createOrderPayload.paymentMethod}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, paymentMethod: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        paymentMethod: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="CREDIT_CARD">Credit card</option>
@@ -1361,10 +1457,14 @@ export default function AdminOrdersPage() {
                                 </select>
                             </div>
                             <div className="md:col-span-2 space-y-2">
-                                <label className="text-xs font-semibold text-slate-500 uppercase">Delivery address</label>
+                                <label className="text-xs font-semibold text-slate-500 uppercase">Delivery
+                                    address</label>
                                 <textarea
                                     value={createOrderPayload.deliveryAddress}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, deliveryAddress: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        deliveryAddress: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1372,7 +1472,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Delivery notes</label>
                                 <textarea
                                     value={createOrderPayload.deliveryNotes}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, deliveryNotes: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        deliveryNotes: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1380,7 +1483,10 @@ export default function AdminOrdersPage() {
                                 <label className="text-xs font-semibold text-slate-500 uppercase">Promo code</label>
                                 <input
                                     value={createOrderPayload.promoCode}
-                                    onChange={(event) => setCreateOrderPayload((prev) => ({ ...prev, promoCode: event.target.value }))}
+                                    onChange={(event) => setCreateOrderPayload((prev) => ({
+                                        ...prev,
+                                        promoCode: event.target.value
+                                    }))}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -1397,7 +1503,7 @@ export default function AdminOrdersPage() {
                                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                     disabled={createOrderMutation.isPending}
                                 >
-                                    {createOrderMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    {createOrderMutation.isPending && <Loader2 className="w-4 h-4 animate-spin"/>}
                                     Create order
                                 </button>
                             </div>

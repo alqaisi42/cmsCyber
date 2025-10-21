@@ -44,16 +44,16 @@ interface OrderSearchResult {
     appliedFilters?: Record<string, unknown>;
 }
 
-function sanitizeSearchFilters(filters: OrderSearchQuery): OrderSearchQuery {
-    const sanitized: Record<string, any> = {};
+function sanitizeSearchFilters<T extends Record<string, any>>(filters: T): T {
+    const sanitized: Partial<T> = {};
     Object.entries(filters).forEach(([key, value]) => {
-        if (value === undefined || value === null || value === '') {
-            return;
-        }
-        sanitized[key] = value;
+        if (value === undefined || value === null || value === '') return;
+        sanitized[key as keyof T] = value;
     });
-    return sanitized;
+    return sanitized as T;
 }
+
+
 
 export function useOrderStatistics() {
     return useQuery<OrderStatistics, Error>({
@@ -77,6 +77,7 @@ export function useAdminOrderStatistics(query: AdminStatisticsQuery = {}) {
         staleTime: 2 * 60 * 1000,
     });
 }
+
 
 export function useOrdersRequiringAttention() {
     return useQuery<AttentionOrderEntry[], Error>({
@@ -117,7 +118,7 @@ export function useOrderSearch(filters: OrderSearchQuery, enabled: boolean = tru
             const response = await ordersService.searchOrders(sanitized);
             return response.data;
         },
-        keepPreviousData: true,
+        placeholderData: (prev) => prev,
         enabled,
     });
 }
