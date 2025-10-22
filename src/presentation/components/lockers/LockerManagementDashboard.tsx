@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     AccessibleSubscription,
     CreateSubscriptionRequest,
@@ -20,9 +20,20 @@ import {
     LockerReservationRequest,
     LockerSummary,
 } from '../../../core/entities/lockers';
+import {
+    LockerIssueDigest,
+    LockerSupportTask,
+    LockerSupportTicket,
+    LockerSupportSummary,
+    LockerTaskImpact,
+    LockerTaskStatus,
+    LockerTicketPriority,
+    LockerTicketStatus,
+} from '../../../core/entities/locker-support';
 import { useAuthStore } from '../../contexts/auth-store';
 import { lockerSubscriptionService } from '../../../infrastructure/services/locker-subscription.service';
 import { lockerManagementService } from '../../../infrastructure/services/locker-management.service';
+import { lockerSupportService } from '../../../infrastructure/services/locker-support.service';
 import {
     ArrowUpRight,
     CalendarCheck,
@@ -36,9 +47,14 @@ import {
     Plus,
     RefreshCw,
     ShieldCheck,
+    LifeBuoy,
+    MessageSquare,
     Users,
     X,
     Info,
+    AlertTriangle,
+    ClipboardList,
+    MessageCircle,
 } from 'lucide-react';
 import { useToast } from '@/presentation/components/ui/toast';
 import { cn } from '../../../shared/utils/cn';
@@ -50,6 +66,7 @@ const tabs = [
     { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
     { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+    { id: 'support', label: 'Support & Issues', icon: LifeBuoy },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['id'];
@@ -165,6 +182,100 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [usageDetails, setUsageDetails] = useState<Record<string, SubscriptionUsageSnapshot>>({});
     const [calendarDetails, setCalendarDetails] = useState<Record<string, FamilyCalendarResponse>>({});
     const [calendarLoading, setCalendarLoading] = useState(false);
+
+    const [supportSummary, setSupportSummary] = useState<LockerSupportSummary | null>(null);
+    const [supportTickets, setSupportTickets] = useState<LockerSupportTicket[]>([]);
+    const [supportTasks, setSupportTasks] = useState<LockerSupportTask[]>([]);
+    const [supportIssues, setSupportIssues] = useState<LockerIssueDigest[]>([]);
+    const [supportLoading, setSupportLoading] = useState(false);
+    const [supportError, setSupportError] = useState<string | null>(null);
+    const [ticketStatusFilter, setTicketStatusFilter] = useState<'ALL' | LockerTicketStatus>('ALL');
+    const [ticketPriorityFilter, setTicketPriorityFilter] = useState<'ALL' | LockerTicketPriority>('ALL');
+    const [taskFilter, setTaskFilter] = useState<'ALL' | 'TODAY' | 'OVERDUE' | 'COMPLETED'>('ALL');
+    const [newTaskForm, setNewTaskForm] = useState<{
+        title: string;
+        owner: string;
+        dueDate: string;
+        impact: LockerTaskImpact;
+        relatedTicketId: string;
+    }>({
+        title: '',
+        owner: '',
+        dueDate: '',
+        impact: 'MEDIUM',
+        relatedTicketId: '',
+    });
+
+    const ticketStatuses: LockerTicketStatus[] = [
+        'NEW',
+        'ACKNOWLEDGED',
+        'IN_PROGRESS',
+        'WAITING_ON_CUSTOMER',
+        'WAITING_ON_PROVIDER',
+        'RESOLVED',
+        'CLOSED',
+    ];
+    const ticketPriorities: LockerTicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    const taskStatuses: LockerTaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'];
+    const taskImpacts: LockerTaskImpact[] = ['LOW', 'MEDIUM', 'HIGH'];
+    const supportOwners = [
+        'Unassigned',
+        'Omar Khalil',
+        'Sara Haddad',
+        'Nour Al-Fayez',
+        'Field Ops',
+        'Maintenance Queue',
+        'Support Triage',
+    ];
+
+    const loadSupportOverview = useCallback(
+        async ({ silent = false }: { silent?: boolean } = {}) => {
+            if (!token) {
+                return false;
+            }
+            if (!silent) {
+                setSupportLoading(true);
+            }
+            setSupportError(null);
+            try {
+                const response = await lockerSupportService.getSupportOverview(token);
+                setSupportSummary(response.data.summary);
+                setSupportTickets(response.data.tickets);
+                setSupportTasks(response.data.tasks);
+                setSupportIssues(response.data.issueDigest);
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Support insights limited',
+                        description:
+                            response.message ||
+                            'Showing cached locker support data until live services are available.',
+                    });
+                } else if (response.errors?.length) {
+                    pushToast({
+                        type: 'info',
+                        title: 'Support overview returned warnings',
+                        description:
+                            response.message || 'Locker support API responded with advisory messages.',
+                    });
+                }
+                return true;
+            } catch (error) {
+                const description =
+                    error instanceof Error ? error.message : 'Unexpected error loading support overview.';
+                setSupportError(description);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load locker support',
+                    description,
+                });
+                return false;
+            } finally {
+                setSupportLoading(false);
+            }
+        },
+        [token, pushToast]
+    );
 
     useEffect(() => {
         setActiveTab(defaultTab);
@@ -287,6 +398,18 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         loadLocations();
         loadLocationHierarchy();
     }, [pushToast, token]);
+
+    useEffect(() => {
+        if (!token) {
+            setSupportSummary(null);
+            setSupportTickets([]);
+            setSupportTasks([]);
+            setSupportIssues([]);
+            return;
+        }
+
+        loadSupportOverview();
+    }, [token, loadSupportOverview]);
 
     useEffect(() => {
         if (!token || !selectedUserId) {
@@ -510,6 +633,60 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             },
         ];
     }, [subscriptions, accessibleSubscriptions, reservations, locations, selectedUserId]);
+
+    const filteredTickets = useMemo(() => {
+        return supportTickets.filter((ticket) => {
+            const matchesStatus = ticketStatusFilter === 'ALL' || ticket.status === ticketStatusFilter;
+            const matchesPriority = ticketPriorityFilter === 'ALL' || ticket.priority === ticketPriorityFilter;
+            return matchesStatus && matchesPriority;
+        });
+    }, [supportTickets, ticketStatusFilter, ticketPriorityFilter]);
+
+    const filteredTasks = useMemo(() => {
+        if (!supportTasks.length) {
+            return supportTasks;
+        }
+        const now = new Date();
+        return supportTasks.filter((task) => {
+            if (taskFilter === 'ALL') {
+                return true;
+            }
+            if (taskFilter === 'COMPLETED') {
+                return task.status === 'COMPLETED';
+            }
+            const dueDate = new Date(task.dueDate);
+            if (Number.isNaN(dueDate.getTime())) {
+                return true;
+            }
+            if (taskFilter === 'TODAY') {
+                return task.status !== 'COMPLETED' && dueDate.toDateString() === now.toDateString();
+            }
+            if (taskFilter === 'OVERDUE') {
+                return task.status !== 'COMPLETED' && dueDate < now;
+            }
+            return true;
+        });
+    }, [supportTasks, taskFilter]);
+
+    const taskProgress = useMemo(() => {
+        if (!supportTasks.length) {
+            return 0;
+        }
+        const completed = supportTasks.filter((task) => task.status === 'COMPLETED').length;
+        return Math.round((completed / supportTasks.length) * 100);
+    }, [supportTasks]);
+
+    const nextActionTicket = useMemo(() => {
+        const ticketsWithDueDate = supportTickets.filter((ticket) => Boolean(ticket.nextActionDueAt));
+        if (!ticketsWithDueDate.length) {
+            return undefined;
+        }
+        return [...ticketsWithDueDate].sort((a, b) => {
+            const dueA = new Date(a.nextActionDueAt ?? '').getTime();
+            const dueB = new Date(b.nextActionDueAt ?? '').getTime();
+            return dueA - dueB;
+        })[0];
+    }, [supportTickets]);
 
     const resetCreateForm = () => {
         setCreateSubscriptionForm({
@@ -829,6 +1006,180 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         }
     };
 
+    const handleRefreshSupport = async () => {
+        const success = await loadSupportOverview({ silent: false });
+        if (success) {
+            pushToast({
+                type: 'success',
+                title: 'Support data refreshed',
+                description: 'Latest support tickets, tasks and issues have been loaded.',
+            });
+        }
+    };
+
+    const handleTicketStatusChange = async (ticketId: string, status: LockerTicketStatus) => {
+        const previousTickets = supportTickets;
+        setSupportTickets((current) =>
+            current.map((ticket) =>
+                ticket.id === ticketId ? { ...ticket, status, updatedAt: new Date().toISOString() } : ticket
+            )
+        );
+        try {
+            const response = await lockerSupportService.updateTicketStatus(ticketId, { status }, token);
+            if (response.errors?.includes('FALLBACK_ACTION')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Ticket status saved locally',
+                    description: response.message || 'Change will sync when the locker support API is reachable.',
+                });
+            } else {
+                pushToast({
+                    type: 'success',
+                    title: 'Ticket updated',
+                    description: response.message || 'Locker support ticket status updated successfully.',
+                });
+            }
+        } catch (error) {
+            setSupportTickets(previousTickets);
+            const description = error instanceof Error ? error.message : 'Unable to update ticket status.';
+            pushToast({ type: 'error', title: 'Ticket update failed', description });
+        }
+    };
+
+    const handleTicketAssignment = async (ticketId: string, assignee: string) => {
+        const previousTickets = supportTickets;
+        const normalizedAssignee = assignee || undefined;
+        setSupportTickets((current) =>
+            current.map((ticket) => (ticket.id === ticketId ? { ...ticket, assignedTo: normalizedAssignee } : ticket))
+        );
+        try {
+            const response = await lockerSupportService.assignTicket(ticketId, { assignee: assignee || 'Unassigned' }, token);
+            if (response.errors?.includes('FALLBACK_ACTION')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Assignment pending sync',
+                    description: response.message || 'We will retry assignment when the support API is available.',
+                });
+            } else {
+                pushToast({
+                    type: 'success',
+                    title: 'Ticket assigned',
+                    description: response.message || 'Ticket ownership updated successfully.',
+                });
+            }
+        } catch (error) {
+            setSupportTickets(previousTickets);
+            const description = error instanceof Error ? error.message : 'Unable to assign ticket.';
+            pushToast({ type: 'error', title: 'Ticket assignment failed', description });
+        }
+    };
+
+    const handleCreateSupportTask = async () => {
+        if (!newTaskForm.title.trim() || !newTaskForm.owner.trim() || !newTaskForm.dueDate) {
+            pushToast({
+                type: 'warning',
+                title: 'Add required task info',
+                description: 'Title, owner and due date are required to create a follow-up task.',
+            });
+            return;
+        }
+        try {
+            const response = await lockerSupportService.createTask(
+                {
+                    title: newTaskForm.title.trim(),
+                    owner: newTaskForm.owner.trim(),
+                    dueDate: newTaskForm.dueDate,
+                    impact: newTaskForm.impact,
+                    relatedTicketId: newTaskForm.relatedTicketId || undefined,
+                },
+                token
+            );
+            setSupportTasks((prev) => [...prev, response.data]);
+            setNewTaskForm({ title: '', owner: '', dueDate: '', impact: 'MEDIUM', relatedTicketId: '' });
+            if (response.errors?.includes('FALLBACK_ACTION')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Task stored offline',
+                    description: response.message || 'Task will sync to the support API when connectivity is restored.',
+                });
+            } else {
+                pushToast({
+                    type: 'success',
+                    title: 'Task created',
+                    description: response.message || 'Follow-up task scheduled successfully.',
+                });
+            }
+        } catch (error) {
+            const description = error instanceof Error ? error.message : 'Unable to create support task.';
+            pushToast({ type: 'error', title: 'Task creation failed', description });
+        }
+    };
+
+    const handleTaskStatusChange = async (taskId: string, status: LockerTaskStatus) => {
+        const previousTasks = supportTasks;
+        setSupportTasks((current) =>
+            current.map((task) => (task.id === taskId ? { ...task, status } : task))
+        );
+        try {
+            const response = await lockerSupportService.updateTask(taskId, { status }, token);
+            if (response.errors?.includes('FALLBACK_ACTION')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Task update queued',
+                    description: response.message || 'Task change saved locally until the API is reachable.',
+                });
+            } else {
+                pushToast({
+                    type: 'success',
+                    title: 'Task updated',
+                    description: response.message || 'Support task updated successfully.',
+                });
+            }
+        } catch (error) {
+            setSupportTasks(previousTasks);
+            const description = error instanceof Error ? error.message : 'Unable to update task.';
+            pushToast({ type: 'error', title: 'Task update failed', description });
+        }
+    };
+
+    const handleSnoozeTask = async (taskId: string, days = 1) => {
+        const task = supportTasks.find((item) => item.id === taskId);
+        if (!task) {
+            return;
+        }
+        const updatedDueDate = new Date(task.dueDate || new Date().toISOString());
+        updatedDueDate.setDate(updatedDueDate.getDate() + days);
+        const previousTasks = supportTasks;
+        setSupportTasks((current) =>
+            current.map((item) =>
+                item.id === taskId ? { ...item, dueDate: updatedDueDate.toISOString(), status: 'IN_PROGRESS' } : item
+            )
+        );
+        try {
+            const response = await lockerSupportService.updateTask(taskId, {
+                dueDate: updatedDueDate.toISOString(),
+                status: 'IN_PROGRESS',
+            });
+            if (response.errors?.includes('FALLBACK_ACTION')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Task snooze pending sync',
+                    description: response.message || 'New due date will sync once the API becomes available.',
+                });
+            } else {
+                pushToast({
+                    type: 'success',
+                    title: 'Task rescheduled',
+                    description: response.message || 'Due date extended successfully.',
+                });
+            }
+        } catch (error) {
+            setSupportTasks(previousTasks);
+            const description = error instanceof Error ? error.message : 'Unable to reschedule task.';
+            pushToast({ type: 'error', title: 'Task reschedule failed', description });
+        }
+    };
+
     const handleLoadUsage = async (subscriptionId: string) => {
         if (usageDetails[subscriptionId] || !token) return;
         try {
@@ -892,6 +1243,470 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             })}
         </div>
     );
+
+    const renderSupport = () => {
+        const metrics = [
+            {
+                label: 'Open tickets',
+                value: supportSummary?.openTickets ?? 0,
+                description: 'Active locker issues under triage',
+                icon: LifeBuoy,
+                accent: 'bg-rose-50 text-rose-600',
+            },
+            {
+                label: 'SLA breaches',
+                value: supportSummary?.breachedTickets ?? 0,
+                description: 'Tickets outside agreed response windows',
+                icon: AlertTriangle,
+                accent: 'bg-amber-50 text-amber-600',
+            },
+            {
+                label: 'Avg. first response',
+                value: `${supportSummary ? supportSummary.avgFirstResponseMinutes : 0}m`,
+                description: 'Minutes to acknowledge new tickets',
+                icon: MessageCircle,
+                accent: 'bg-blue-50 text-blue-600',
+            },
+            {
+                label: 'Resolution velocity',
+                value: `${supportSummary ? supportSummary.avgResolutionHours : 0}h`,
+                description: 'Median resolution time across incidents',
+                icon: Clock,
+                accent: 'bg-emerald-50 text-emerald-600',
+            },
+        ];
+
+        const issueTrendLegend: Record<LockerIssueDigest['trend'], string> = {
+            UP: 'text-rose-600',
+            STABLE: 'text-amber-600',
+            DOWN: 'text-emerald-600',
+        };
+
+        return (
+            <div className="space-y-6">
+                <div id="locker-support-playbook" className="sr-only" aria-hidden="true"></div>
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm uppercase tracking-wide">
+                                <LifeBuoy className="w-4 h-4" />
+                                Locker Care Desk
+                            </div>
+                            <h2 className="mt-2 text-2xl font-bold text-gray-900">Support &amp; Incident Response</h2>
+                            <p className="text-gray-500">
+                                Monitor escalations, coach agents, and coordinate field teams across locker locations in real time.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={handleRefreshSupport}
+                                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                                disabled={supportLoading}
+                            >
+                                {supportLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="w-4 h-4" />
+                                )}
+                                Refresh
+                            </button>
+                            <a
+                                href="#locker-support-playbook"
+                                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+                            >
+                                <ArrowUpRight className="w-4 h-4" />
+                                View playbook
+                            </a>
+                        </div>
+                    </div>
+                    {supportError && (
+                        <div className="mt-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold">Support data might be stale</p>
+                                <p className="mt-1 text-amber-600">{supportError}</p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {metrics.map((metric) => {
+                            const MetricIcon = metric.icon;
+                            return (
+                                <div key={metric.label} className="rounded-xl border border-gray-100 bg-gray-50 p-5 shadow-sm">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                {metric.label}
+                                            </p>
+                                            <p className="mt-2 text-3xl font-bold text-gray-900">{metric.value}</p>
+                                            <p className="mt-2 text-xs text-gray-500">{metric.description}</p>
+                                        </div>
+                                        <span className={cn('rounded-full p-3', metric.accent)}>
+                                            <MetricIcon className="h-5 w-5" />
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                    <div className="space-y-6 xl:col-span-2">
+                        <div className="rounded-xl bg-white p-6 shadow-sm">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Live incident queue</h3>
+                                    <p className="text-sm text-gray-500">
+                                        Prioritise escalations, acknowledge blockers, and align stakeholders before SLAs slip.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <select
+                                        value={ticketStatusFilter}
+                                        onChange={(event) =>
+                                            setTicketStatusFilter(event.target.value as typeof ticketStatusFilter)
+                                        }
+                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="ALL">All statuses</option>
+                                        {ticketStatuses.map((status) => (
+                                            <option key={status} value={status}>
+                                                {status.replaceAll('_', ' ')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={ticketPriorityFilter}
+                                        onChange={(event) =>
+                                            setTicketPriorityFilter(event.target.value as typeof ticketPriorityFilter)
+                                        }
+                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="ALL">All priorities</option>
+                                        {ticketPriorities.map((priority) => (
+                                            <option key={priority} value={priority}>
+                                                {priority}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 space-y-4">
+                                {supportLoading && (
+                                    <div className="flex items-center justify-center rounded-lg border border-dashed border-blue-200 bg-blue-50 p-6 text-sm text-blue-600">
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing support feed...
+                                    </div>
+                                )}
+                                {!supportLoading && filteredTickets.length === 0 && (
+                                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                                        No tickets match the current filters. Adjust filters or refresh to load new incidents.
+                                    </div>
+                                )}
+                                {filteredTickets.map((ticket) => {
+                                    const PriorityIcon = ticket.priority === 'CRITICAL' || ticket.priority === 'HIGH' ? AlertTriangle : MessageSquare;
+                                    return (
+                                        <div key={ticket.id} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                                            <div className="flex flex-col gap-4 md:flex-row md:justify-between">
+                                                <div className="flex-1 space-y-1">
+                                                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                                                        <PriorityIcon className="h-4 w-4 text-rose-500" />
+                                                        {ticket.subject}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500">
+                                                        #{ticket.id} • {ticket.lockerCode} • {ticket.priority} priority
+                                                    </p>
+                                                    <p className="text-sm text-gray-600">{ticket.description}</p>
+                                                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                                        <span>Reported by {ticket.reportedBy}</span>
+                                                        <span>Channel: {ticket.channel}</span>
+                                                        {ticket.nextActionDueAt && (
+                                                            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-600">
+                                                                Next action {new Date(ticket.nextActionDueAt).toLocaleString()}
+                                                            </span>
+                                                        )}
+                                                        {ticket.tags?.map((tag) => (
+                                                            <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                                                                #{tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-2 text-sm">
+                                                    <label className="text-xs font-semibold uppercase text-gray-500">Owner</label>
+                                                    <select
+                                                        value={ticket.assignedTo || ''}
+                                                        onChange={(event) => handleTicketAssignment(ticket.id, event.target.value)}
+                                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        {supportOwners.map((owner) => (
+                                                            <option key={owner} value={owner === 'Unassigned' ? '' : owner}>
+                                                                {owner}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <label className="mt-2 text-xs font-semibold uppercase text-gray-500">
+                                                        Status
+                                                    </label>
+                                                    <select
+                                                        value={ticket.status}
+                                                        onChange={(event) =>
+                                                            handleTicketStatusChange(ticket.id, event.target.value as LockerTicketStatus)
+                                                        }
+                                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        {ticketStatuses.map((status) => (
+                                                            <option key={status} value={status}>
+                                                                {status.replaceAll('_', ' ')}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {ticket.timeline && ticket.timeline.length > 0 && (
+                                                <div className="mt-4 border-t border-gray-100 pt-4">
+                                                    <p className="text-xs font-semibold uppercase text-gray-500">Timeline</p>
+                                                    <ol className="mt-2 space-y-2 text-xs text-gray-600">
+                                                        {ticket.timeline.slice(0, 3).map((event) => (
+                                                            <li key={event.id} className="flex items-start gap-2">
+                                                                <span className="mt-0.5 h-2 w-2 rounded-full bg-blue-500"></span>
+                                                                <div>
+                                                                    <p className="font-medium text-gray-700">{event.summary}</p>
+                                                                    <p className="text-[11px] uppercase text-gray-400">
+                                                                        {event.type.replaceAll('_', ' ')} • {event.author} •{' '}
+                                                                        {new Date(event.occurredAt).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                    </ol>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="rounded-xl bg-white p-6 shadow-sm">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Task runway</h3>
+                                    <p className="text-sm text-gray-500">
+                                        Orchestrate engineering, field ops, and customer comms with a single backlog.
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-semibold uppercase text-gray-500">Completion</p>
+                                    <p className="text-lg font-bold text-gray-900">{taskProgress}%</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <select
+                                    value={taskFilter}
+                                    onChange={(event) => setTaskFilter(event.target.value as typeof taskFilter)}
+                                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="ALL">All tasks</option>
+                                    <option value="TODAY">Due today</option>
+                                    <option value="OVERDUE">Overdue</option>
+                                    <option value="COMPLETED">Completed</option>
+                                </select>
+                            </div>
+
+                            <div className="mt-4 space-y-3">
+                                {filteredTasks.length === 0 ? (
+                                    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                                        No tasks in this view. Assign owners to critical tickets or log a new follow-up.
+                                    </div>
+                                ) : (
+                                    filteredTasks.map((task) => (
+                                        <div key={task.id} className="rounded-lg border border-gray-100 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-900">{task.title}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Owned by {task.owner} • Due {new Date(task.dueDate).toLocaleString()}
+                                                    </p>
+                                                    {task.relatedTicketId && (
+                                                        <p className="mt-1 text-xs text-blue-600">
+                                                            Linked ticket: {task.relatedTicketId}
+                                                        </p>
+                                                    )}
+                                                    {task.description && (
+                                                        <p className="mt-1 text-xs text-gray-600">{task.description}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col gap-2 text-xs">
+                                                    <select
+                                                        value={task.status}
+                                                        onChange={(event) =>
+                                                            handleTaskStatusChange(task.id, event.target.value as LockerTaskStatus)
+                                                        }
+                                                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    >
+                                                        {taskStatuses.map((status) => (
+                                                            <option key={status} value={status}>
+                                                                {status.replaceAll('_', ' ')}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={() => handleSnoozeTask(task.id, 1)}
+                                                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                                                    >
+                                                        <Clock className="h-3 w-3" />
+                                                        Snooze +1d
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="mt-6 border-t border-gray-100 pt-4">
+                                <p className="text-sm font-semibold text-gray-900">Log a new follow-up</p>
+                                <div className="mt-3 grid grid-cols-1 gap-3">
+                                    <input
+                                        type="text"
+                                        value={newTaskForm.title}
+                                        onChange={(event) => setNewTaskForm((prev) => ({ ...prev, title: event.target.value }))}
+                                        placeholder="Task title"
+                                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <select
+                                            value={newTaskForm.owner}
+                                            onChange={(event) => setNewTaskForm((prev) => ({ ...prev, owner: event.target.value }))}
+                                            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">Assign owner</option>
+                                            {supportOwners.map((owner) => (
+                                                <option key={owner} value={owner === 'Unassigned' ? '' : owner}>
+                                                    {owner}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={newTaskForm.impact}
+                                            onChange={(event) =>
+                                                setNewTaskForm((prev) => ({
+                                                    ...prev,
+                                                    impact: event.target.value as LockerTaskImpact,
+                                                }))
+                                            }
+                                            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            {taskImpacts.map((impact) => (
+                                                <option key={impact} value={impact}>
+                                                    {impact} impact
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <input
+                                            type="datetime-local"
+                                            value={newTaskForm.dueDate}
+                                            onChange={(event) => setNewTaskForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                                            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <select
+                                            value={newTaskForm.relatedTicketId}
+                                            onChange={(event) =>
+                                                setNewTaskForm((prev) => ({ ...prev, relatedTicketId: event.target.value }))
+                                            }
+                                            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">Link to ticket (optional)</option>
+                                            {supportTickets.map((ticket) => (
+                                                <option key={ticket.id} value={ticket.id}>
+                                                    {ticket.id} — {ticket.subject}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={handleCreateSupportTask}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                    >
+                                        <ClipboardList className="h-4 w-4" />
+                                        Create task
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-900">Location issue digest</h3>
+                            <p className="text-sm text-gray-500">
+                                Quickly spot hotspots and align preventive maintenance with customer feedback loops.
+                            </p>
+                            <div className="mt-4 space-y-3">
+                                {supportIssues.length === 0 ? (
+                                    <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                                        No open incidents for locker locations. Keep monitoring the reservation feed for anomalies.
+                                    </p>
+                                ) : (
+                                    supportIssues.map((issue) => (
+                                        <div key={issue.locationId} className="rounded-lg border border-gray-100 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-900">{issue.locationName}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {issue.activeIssues} active • {issue.escalations} escalations
+                                                    </p>
+                                                </div>
+                                                <span className={cn('text-xs font-semibold uppercase', issueTrendLegend[issue.trend])}>
+                                                    Trend {issue.trend.toLowerCase()}
+                                                </span>
+                                            </div>
+                                            {issue.description && (
+                                                <p className="mt-2 text-xs text-gray-600">{issue.description}</p>
+                                            )}
+                                            {issue.lastIncidentAt && (
+                                                <p className="mt-1 text-[11px] uppercase text-gray-400">
+                                                    Last incident {new Date(issue.lastIncidentAt).toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {nextActionTicket && (
+                            <div className="rounded-xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    <Clock className="mt-1 h-5 w-5 text-blue-600" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-blue-900">Next action due soon</p>
+                                        <p className="text-xs text-blue-800">
+                                            {nextActionTicket.subject} ({nextActionTicket.priority} priority) requires follow-up by{' '}
+                                            {nextActionTicket.assignedTo || 'Unassigned'} at{' '}
+                                            {new Date(nextActionTicket.nextActionDueAt ?? '').toLocaleString()}.
+                                        </p>
+                                        <button
+                                            onClick={() => handleTicketStatusChange(nextActionTicket.id, 'IN_PROGRESS')}
+                                            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                                        >
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            Acknowledge
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     const renderOverview = () => (
         <div className="space-y-6">
@@ -2161,6 +2976,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             {activeTab === 'locations' && renderLocationsManagement()}
             {activeTab === 'lockers' && renderLockers()}
             {activeTab === 'reservations' && renderReservations()}
+            {activeTab === 'support' && renderSupport()}
         </div>
     );
 }
