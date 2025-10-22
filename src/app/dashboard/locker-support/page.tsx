@@ -1,8 +1,14 @@
 // src/app/dashboard/locker-support/page.tsx
 'use client';
 
-import LockerManagementDashboard from '../../../presentation/components/lockers/LockerManagementDashboard';
+import LockerSupportWorkspace from '../../../presentation/components/lockers/LockerSupportWorkspace';
 
 export default function LockerSupportPage() {
-    return <LockerManagementDashboard defaultTab="support" />;
+    return (
+        <div className="min-h-screen bg-gray-50 py-8">
+            <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
+                <LockerSupportWorkspace />
+            </div>
+        </div>
+    );
 }
