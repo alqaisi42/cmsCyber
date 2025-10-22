@@ -6,7 +6,8 @@ import {
     CreateSubscriptionRequest,
     LockerSubscription,
     LockerSubscriptionPlan,
-    ShareSubscriptionRequest, SubscriptionUsageSnapshot,
+    ShareSubscriptionRequest,
+    SubscriptionUsageSnapshot,
     UpdateSharingRequest,
 } from '../../../core/entities/locker-subscription';
 import {
@@ -403,17 +404,29 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         const loadAvailable = async () => {
             const specificUserFallback = selectedUserId ?? availabilityForm.userId ?? reservationForm.userId ?? null;
             const requiresSpecificUser = availabilityScope === 'SPECIFIC_USER' || reservationScope === 'SPECIFIC_USER';
-            const userContext = requiresSpecificUser ? specificUserFallback : undefined;
+            const userContext = requiresSpecificUser ? specificUserFallback : null;
 
-            if (requiresSpecificUser && (userContext === undefined || userContext === null)) {
+            if (
+                requiresSpecificUser &&
+                (typeof userContext !== 'number' || Number.isNaN(userContext) || userContext <= 0)
+            ) {
                 setAvailableLockers([]);
                 return;
             }
+
+            const desiredStart = availabilityForm.requestedFrom || reservationForm.reservedFrom || '';
+            const desiredEnd = availabilityForm.requestedUntil || reservationForm.reservedUntil || '';
             try {
                 const response = await lockerManagementService.getAvailableLockersForUser(
                     userContext,
                     selectedLocationId,
-                    token
+                    token,
+                    {
+                        size: availabilityForm.requiredSize,
+                        startTime: desiredStart || undefined,
+                        endTime: desiredEnd || undefined,
+                        scope: requiresSpecificUser ? 'SPECIFIC_USER' : 'ALL_USERS',
+                    }
                 );
                 setAvailableLockers(response.data);
             } catch (error) {
@@ -437,6 +450,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         reservationScope,
         availabilityForm.userId,
         reservationForm.userId,
+        availabilityForm.requiredSize,
+        availabilityForm.requestedFrom,
+        availabilityForm.requestedUntil,
+        reservationForm.reservedFrom,
+        reservationForm.reservedUntil,
     ]);
 
     const summaryMetrics = useMemo(() => {

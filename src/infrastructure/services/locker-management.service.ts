@@ -7,7 +7,10 @@ import {
     LockerAvailabilityRequest,
     LockerAvailabilityResult,
     LockerLocation,
+    LockerLocationStats,
+    LockerLocationTreeNode,
     LockerLocationWithLockers,
+    LockerSize,
     LockerReservation,
     LockerReservationActionResponse,
     LockerReservationRequest,
@@ -33,6 +36,25 @@ interface LockerPagedData<T> {
 }
 
 type LockerPagedResponse<T> = LockerApiResponse<LockerPagedData<T>>;
+
+interface AvailableLockerDto {
+    id: string;
+    code: string;
+    name?: string;
+    size: LockerSize;
+    maxCapacity?: number;
+    availableCapacity?: number;
+    availableTimeSlots?: Array<{
+        startTime: string;
+        endTime: string;
+        isAvailable: boolean;
+    }>;
+    nextAvailableFrom?: string | null;
+    isCurrentlyAvailable?: boolean;
+    locationId?: string;
+    locationName?: string;
+    subscriptionId?: string;
+}
 
 const FALLBACK_LOCATIONS: LockerLocation[] = [
     {
@@ -131,7 +153,7 @@ const FALLBACK_LOCATION_TREE: LockerLocationWithLockers[] = FALLBACK_LOCATIONS.m
 class LockerManagementService {
     private readonly adminBaseUrl = '/api/v1/admin';
     private readonly baseUrl = `${this.adminBaseUrl}/lockers`;
-    private readonly locationsUrl = `${this.adminBaseUrl}/locker-locations`;
+    private readonly locationsUrl = `${this.baseUrl}/locations`;
     private readonly calendarUrl = '/api/v1/family-calendar';
 
     private resolveToken(explicitToken?: string): string | null {
@@ -158,6 +180,28 @@ class LockerManagementService {
             headers['Authorization'] = `Bearer ${resolvedToken}`;
         }
         return headers;
+    }
+
+    private mapStatsToLocation(stats: LockerLocationStats): LockerLocation {
+        const city = stats.address?.split('-')[0]?.trim() || 'Unknown';
+        return {
+            id: stats.id,
+            code: stats.code,
+            name: stats.name,
+            address: stats.address ?? 'Address not available',
+            city,
+            coordinates:
+                typeof stats.latitude === 'number' && typeof stats.longitude === 'number'
+                    ? { latitude: stats.latitude, longitude: stats.longitude }
+                    : undefined,
+            operatingHours: undefined,
+            features: undefined,
+            availableLockerSizes: undefined,
+            totalLockers: stats.totalLockers ?? 0,
+            availableLockers: stats.availableLockers ?? 0,
+            status: stats.isActive ? 'ACTIVE' : 'INACTIVE',
+            createdAt: undefined,
+        };
     }
 
     private async fetchWithAlternatives<T>(endpoints: string[], token?: string): Promise<LockerApiResponse<T>> {
@@ -187,15 +231,19 @@ class LockerManagementService {
 
     async getLocations(token?: string): Promise<LockerApiResponse<LockerLocation[]>> {
         try {
-            return await this.fetchWithAlternatives<LockerLocation[]>(
+            const response = await this.fetchWithAlternatives<LockerLocationStats[]>(
                 [
+                    `${this.locationsUrl}/stats`,
                     `${this.locationsUrl}`,
                     `${this.locationsUrl}/list`,
-                    `${this.adminBaseUrl}/locations`,
-                    `${this.baseUrl}/locations`,
                 ],
                 token
             );
+
+            return {
+                ...response,
+                data: (response.data ?? []).map((stats) => this.mapStatsToLocation(stats)),
+            };
         } catch (error) {
             console.warn('Failed to fetch locker locations. Using fallback data.', error);
             return {
@@ -210,16 +258,70 @@ class LockerManagementService {
 
     async getLocationsHierarchy(token?: string): Promise<LockerApiResponse<LockerLocationWithLockers[]>> {
         try {
-            const hierarchy = await this.fetchWithAlternatives<LockerLocationWithLockers[]>(
-                [
-                    `${this.locationsUrl}/with-lockers`,
-                    `${this.locationsUrl}/hierarchy`,
-                    `${this.adminBaseUrl}/locations/with-lockers`,
-                    `${this.baseUrl}/locations/tree`,
-                ],
-                token
+            const [treeResponse, locationsResponse] = await Promise.all([
+                this.fetchWithAlternatives<LockerLocationTreeNode[]>(
+                    [
+                        `${this.locationsUrl}/tree`,
+                        `${this.baseUrl}/locations/tree`,
+                    ],
+                    token
+                ),
+                this.getLocations(token),
+            ]);
+
+            const locationIndex = new Map<string, LockerLocation>();
+            (locationsResponse.data ?? []).forEach((location) => {
+                locationIndex.set(location.id, location);
+            });
+
+            const aggregatedErrors = new Set<string>();
+            (treeResponse.errors ?? []).forEach((error) => error && aggregatedErrors.add(error));
+            (locationsResponse.errors ?? []).forEach((error) => error && aggregatedErrors.add(error));
+
+            const hierarchyData = await Promise.all(
+                (treeResponse.data ?? [])
+                    .filter((node) => node.type === 'LOCATION')
+                    .map(async (locationNode) => {
+                        const lockersResponse = await this.getLockersByLocation(locationNode.id, token);
+                        (lockersResponse.errors ?? []).forEach((error) => error && aggregatedErrors.add(error));
+
+                        const lockers = lockersResponse.data ?? [];
+                        const baseLocation = locationIndex.get(locationNode.id);
+                        const location = baseLocation
+                            ? { ...baseLocation }
+                            : {
+                                id: locationNode.id,
+                                code: locationNode.code,
+                                name: locationNode.name,
+                                address: 'Address not available',
+                                city: 'Unknown',
+                                totalLockers: locationNode.lockerCount,
+                                availableLockers: locationNode.availableLockerCount,
+                                status: 'ACTIVE',
+                            };
+
+                        return {
+                            location,
+                            lockers,
+                            totalLockers:
+                                lockers.length || location.totalLockers || locationNode.lockerCount,
+                            availableLockers:
+                                lockers.length
+                                    ? lockers.filter((locker) => locker.status === 'AVAILABLE').length
+                                    : location.availableLockers || locationNode.availableLockerCount,
+                            maintenanceCount: lockers.filter((locker) => locker.status === 'MAINTENANCE').length,
+                            issueCount: 0,
+                        } satisfies LockerLocationWithLockers;
+                    })
             );
-            return hierarchy;
+
+            return {
+                success: true,
+                data: hierarchyData,
+                message: treeResponse.message || 'Location tree loaded successfully',
+                errors: Array.from(aggregatedErrors),
+                timestamp: new Date().toISOString(),
+            };
         } catch (primaryError) {
             console.warn('Failed to fetch location locker hierarchy from dedicated endpoint. Attempting manual aggregation.', primaryError);
             try {
@@ -357,11 +459,37 @@ class LockerManagementService {
         return response.json();
     }
 
-    async getAvailableLockersForUser(userId: number | null | undefined, locationId: string, token?: string) {
-        const isSpecificUser = typeof userId === 'number' && userId > 0;
-        const endpoint = isSpecificUser
-            ? `${this.baseUrl}/users/${userId}/locations/${locationId}/available-lockers`
-            : `${this.baseUrl}/locations/${locationId}/available-lockers`;
+    async getAvailableLockersForUser(
+        userId: number | null | undefined,
+        locationId: string,
+        token?: string,
+        filters?: {
+            size?: LockerSize;
+            startTime?: string;
+            endTime?: string;
+            scope?: 'SPECIFIC_USER' | 'ALL_USERS';
+        }
+    ): Promise<LockerApiResponse<LockerSummary[]>> {
+        const params = new URLSearchParams();
+        if (filters?.size) {
+            params.set('size', filters.size);
+        }
+        if (filters?.startTime) {
+            params.set('startTime', filters.startTime);
+        }
+        if (filters?.endTime) {
+            params.set('endTime', filters.endTime);
+        }
+        if (filters?.scope) {
+            params.set('scope', filters.scope);
+        }
+        if (typeof userId === 'number' && !Number.isNaN(userId)) {
+            params.set('userId', String(userId));
+        }
+
+        const endpoint = `${this.locationsUrl}/${locationId}/available-lockers${
+            params.toString() ? `?${params.toString()}` : ''
+        }`;
 
         try {
             const response = await fetch(endpoint, {
@@ -372,7 +500,26 @@ class LockerManagementService {
                 const errorBody = await response.json().catch(() => null);
                 throw new Error(errorBody?.message || `Failed to load available lockers: ${response.status}`);
             }
-            return await response.json();
+
+            const payload: LockerApiResponse<AvailableLockerDto[]> = await response.json();
+            return {
+                ...payload,
+                data: (payload.data ?? []).map((locker) => ({
+                    id: locker.id,
+                    code: locker.code,
+                    lockerNumber: locker.name ?? locker.code,
+                    subscriptionId: locker.subscriptionId,
+                    locationId: locker.locationId ?? locationId,
+                    locationName: locker.locationName,
+                    size: locker.size,
+                    status: locker.isCurrentlyAvailable === false ? 'OCCUPIED' : 'AVAILABLE',
+                    maxCapacity: locker.maxCapacity,
+                    availableCapacity: locker.availableCapacity,
+                    availableTimeSlots: locker.availableTimeSlots,
+                    nextAvailableFrom: locker.nextAvailableFrom ?? null,
+                    isCurrentlyAvailable: locker.isCurrentlyAvailable ?? true,
+                })),
+            };
         } catch (error) {
             console.warn('Failed to fetch available lockers. Using fallback data.', error);
             const lockers = FALLBACK_LOCKERS.filter((locker) => locker.locationId === locationId);

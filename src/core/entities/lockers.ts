@@ -42,6 +42,41 @@ export interface LockerLocation {
     createdAt?: string;
 }
 
+export interface LockerLocationStats {
+    id: string;
+    code: string;
+    name: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    isActive: boolean;
+    totalLockers: number;
+    availableLockers: number;
+    occupiedLockers: number;
+    maintenanceLockers: number;
+    outOfServiceLockers: number;
+    utilizationRate?: number;
+    subscriptions?: Array<{
+        id: string;
+        ownerUserId: number;
+        ownerName: string;
+        subscriptionType: string;
+        subscriptionStatus: string;
+        lockerCount: number;
+        availableLockerCount: number;
+    }>;
+}
+
+export interface LockerLocationTreeNode {
+    id: string;
+    code: string;
+    name: string;
+    type: 'LOCATION' | 'SUBSCRIPTION' | 'LOCKER';
+    lockerCount: number;
+    availableLockerCount: number;
+    children: LockerLocationTreeNode[];
+}
+
 export interface LockerSummary {
     id: string;
     code: string;
@@ -56,6 +91,14 @@ export interface LockerSummary {
     currentReservation?: LockerReservation | null;
     nextAvailableFrom?: string | null;
     isActive?: boolean;
+    maxCapacity?: number;
+    availableCapacity?: number;
+    isCurrentlyAvailable?: boolean;
+    availableTimeSlots?: Array<{
+        startTime: string;
+        endTime: string;
+        isAvailable: boolean;
+    }>;
 }
 
 export interface LockerAvailabilityRequest {
