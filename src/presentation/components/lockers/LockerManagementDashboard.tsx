@@ -227,6 +227,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 if (response.data.length) {
                     setSelectedLocationId((prev) => prev || response.data[0].id);
                 }
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Locations are cached',
+                        description: response.message ||
+                            'Showing cached locker locations while the admin API is unreachable.',
+                    });
+                }
             } catch (error) {
                 console.error('Failed to load locations:', error);
                 pushToast({
@@ -251,6 +259,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         title: 'Limited location data',
                         description: response.message ||
                             'Showing cached location structure while the admin API is unavailable.',
+                    });
+                } else if (response.errors?.includes('FALLBACK_AVAILABLE_ONLY')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Partial locker data',
+                        description:
+                            response.message ||
+                            'Only currently available lockers could be retrieved for one or more locations.',
                     });
                 }
             } catch (error) {
