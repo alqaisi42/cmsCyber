@@ -402,14 +402,20 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         };
 
         const loadAvailable = async () => {
-            const userContext =
-                availabilityScope === 'ALL_USERS' || reservationScope === 'ALL_USERS' ? 0 : selectedUserId;
-            if (userContext === undefined || userContext === null) {
+            const specificUserFallback = selectedUserId ?? availabilityForm.userId ?? reservationForm.userId ?? null;
+            const requiresSpecificUser = availabilityScope === 'SPECIFIC_USER' || reservationScope === 'SPECIFIC_USER';
+            const userContext = requiresSpecificUser ? specificUserFallback : undefined;
+
+            if (requiresSpecificUser && (userContext === undefined || userContext === null)) {
                 setAvailableLockers([]);
                 return;
             }
             try {
-                const response = await lockerManagementService.getAvailableLockersForUser(userContext, selectedLocationId, token);
+                const response = await lockerManagementService.getAvailableLockersForUser(
+                    userContext,
+                    selectedLocationId,
+                    token
+                );
                 setAvailableLockers(response.data);
             } catch (error) {
                 console.error('Failed to load available lockers for user:', error);
@@ -423,7 +429,16 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
         loadLocationLockers();
         loadAvailable();
-    }, [selectedLocationId, selectedUserId, token, pushToast, availabilityScope, reservationScope]);
+    }, [
+        selectedLocationId,
+        selectedUserId,
+        token,
+        pushToast,
+        availabilityScope,
+        reservationScope,
+        availabilityForm.userId,
+        reservationForm.userId,
+    ]);
 
     const summaryMetrics = useMemo(() => {
         const activeSubscriptions = activePlans.length || subscriptions.filter((sub) => sub.subscriptionStatus === 'ACTIVE').length;

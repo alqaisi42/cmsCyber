@@ -36,7 +36,7 @@ type LockerPagedResponse<T> = LockerApiResponse<LockerPagedData<T>>;
 
 const FALLBACK_LOCATIONS: LockerLocation[] = [
     {
-        id: 'loc-660e8400-e29b-41d4-a716-446655440001',
+        id: '750e8400-e29b-41d4-a716-446655440020',
         code: 'LOC-001',
         name: 'Medical City Hub',
         address: 'Amman - Medical City Street, Building 12',
@@ -59,7 +59,7 @@ const FALLBACK_LOCATIONS: LockerLocation[] = [
         createdAt: '2024-01-15T10:00:00',
     },
     {
-        id: 'loc-ff0e8400-e29b-41d4-a716-446655440010',
+        id: '750e8400-e29b-41d4-a716-446655440021',
         code: 'LOC-002',
         name: 'Downtown Center',
         address: 'Amman - Rainbow Street, Near Jabal Amman',
@@ -85,11 +85,11 @@ const FALLBACK_LOCATIONS: LockerLocation[] = [
 
 const FALLBACK_LOCKERS: LockerSummary[] = [
     {
-        id: 'locker-770e8400-e29b-41d4-a716-446655440002',
+        id: '850e8400-e29b-41d4-a716-446655440100',
         code: 'LOC-001-SUB-001-0012',
         lockerNumber: '0012',
-        subscriptionId: 'sub-550e8400-e29b-41d4-a716-446655440000',
-        locationId: 'loc-660e8400-e29b-41d4-a716-446655440001',
+        subscriptionId: '650e8400-e29b-41d4-a716-446655440010',
+        locationId: '750e8400-e29b-41d4-a716-446655440020',
         locationName: 'Medical City Hub',
         size: 'MEDIUM',
         status: 'AVAILABLE',
@@ -100,11 +100,11 @@ const FALLBACK_LOCKERS: LockerSummary[] = [
         isActive: true,
     },
     {
-        id: 'locker-dd0e8400-e29b-41d4-a716-446655440008',
+        id: '850e8400-e29b-41d4-a716-446655440101',
         code: 'LOC-001-SUB-001-0015',
         lockerNumber: '0015',
-        subscriptionId: 'sub-550e8400-e29b-41d4-a716-446655440000',
-        locationId: 'loc-660e8400-e29b-41d4-a716-446655440001',
+        subscriptionId: '650e8400-e29b-41d4-a716-446655440010',
+        locationId: '750e8400-e29b-41d4-a716-446655440020',
         locationName: 'Medical City Hub',
         size: 'LARGE',
         status: 'AVAILABLE',
@@ -279,15 +279,33 @@ class LockerManagementService {
         return response.json();
     }
 
-    async getAvailableLockersForUser(userId: number, locationId: string, token?: string) {
-        const response = await fetch(`${this.baseUrl}/users/${userId}/locations/${locationId}/available-lockers`, {
-            cache: 'no-store',
-            headers: this.getHeaders(token),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to load available lockers: ${response.status}`);
+    async getAvailableLockersForUser(userId: number | null | undefined, locationId: string, token?: string) {
+        const isSpecificUser = typeof userId === 'number' && userId > 0;
+        const endpoint = isSpecificUser
+            ? `${this.baseUrl}/users/${userId}/locations/${locationId}/available-lockers`
+            : `${this.baseUrl}/locations/${locationId}/available-lockers`;
+
+        try {
+            const response = await fetch(endpoint, {
+                cache: 'no-store',
+                headers: this.getHeaders(token),
+            });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => null);
+                throw new Error(errorBody?.message || `Failed to load available lockers: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.warn('Failed to fetch available lockers. Using fallback data.', error);
+            const lockers = FALLBACK_LOCKERS.filter((locker) => locker.locationId === locationId);
+            return {
+                success: true,
+                data: lockers.length ? lockers : FALLBACK_LOCKERS,
+                message: 'Showing fallback available lockers',
+                errors: ['FALLBACK_DATA'],
+                timestamp: new Date().toISOString(),
+            };
         }
-        return response.json();
     }
 
     async checkLockerAvailability(payload: LockerAvailabilityRequest, token?: string): Promise<LockerApiResponse<LockerAvailabilityResult>> {
