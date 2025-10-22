@@ -1,7 +1,7 @@
 // src/core/entities/locker-subscription.ts
-// Domain types representing locker subscription plans and user subscriptions
+// Domain types aligned with the Locker Subscription REST API contract
 
-export type BillingCycle = 'MONTHLY' | 'YEARLY';
+export type BillingCycle = 'MONTHLY' | 'ANNUAL';
 
 export interface LockerSubscriptionPlan {
     id: string;
@@ -14,144 +14,107 @@ export interface LockerSubscriptionPlan {
     sharingEnabled: boolean;
     maxSharedUsers: number;
     description?: string;
-    isActive?: boolean;
 }
 
-export type SubscriptionStatus = 'ACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
+export type SharingType = 'BASIC' | 'OWNER';
+export type AccessLevel = 'BASIC_ACCESS' | 'FULL_ACCESS';
+export type SharingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'REVOKED' | 'EXPIRED';
 
-export interface AssignedLockerSummary {
-    lockerId: string;
-    lockerNumber: string;
-    size: string;
-    isAvailable?: boolean;
+export interface LockerLocationRef {
+    id: string;
+    code: string;
+    name: string;
+    address: string;
 }
 
-export interface SubscriptionFeaturesSummary {
-    maxLockers: number;
-    allowSharing: boolean;
-    maxSharedUsers: number;
-    currentSharedUsers?: number;
-}
-
-export interface SubscriptionUsageStatistics {
-    reservationsThisMonth: number;
-    maxReservationsPerMonth: number;
-    utilizationRate: number;
-}
-
-export interface LockerUsageSummary {
-    assignedLockers: number;
-    maxLockers: number;
-    activeReservations: number;
-    mostUsedLocker?: {
-        lockerId: string;
-        lockerNumber: string;
-        usageCount: number;
-    };
-}
-
-export interface SharingUsageSummary {
-    activeSharedUsers: number;
-    maxSharedUsers: number;
-    totalSharedReservations: number;
-    sharedUsersBreakdown?: Array<{
-        userId: number;
-        userName: string;
-        reservationsCount: number;
-        lastAccessDate: string;
-    }>;
-}
-
-export interface FinancialSummary {
-    monthlyCharge: number;
-    nextBillingDate: string;
-    totalPaidToDate: number;
-    discountsApplied: number;
-}
-
-export interface SubscriptionUsageResponse {
-    subscriptionId: string;
+export interface UsageByUser {
     userId: number;
-    planName: string;
-    billingCycle: BillingCycle;
-    currentPeriod: {
-        startDate: string;
-        endDate: string;
-    };
-    reservationUsage: SubscriptionUsageStatistics;
-    lockerUsage: LockerUsageSummary;
-    sharingUsage: SharingUsageSummary;
-    financialSummary: FinancialSummary;
+    userName: string;
+    activeReservations: number;
+    allocatedBalance: number | null;
+    sharingType: SharingType;
 }
+
+export interface SubscriptionUsageSnapshot {
+    activeReservations: number;
+    availableCapacity: number;
+    totalCapacity: number;
+    usageByUser: UsageByUser[];
+}
+
+export interface InvitationDetails {
+    invitationToken: string | null;
+    invitedAt: string;
+    expiresAt: string | null;
+    invitedByUserName: string;
+}
+
+export interface SharedSubscriptionUser {
+    id: string;
+    sharedWithUserId: number;
+    sharedWithUserName: string;
+    sharingType: SharingType;
+    allocatedBalance: number | null;
+    currentUsage: number;
+    sharingStatus: SharingStatus;
+    accessLevel: AccessLevel;
+    invitationDetails: InvitationDetails;
+}
+
+export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'SUSPENDED';
 
 export interface LockerSubscription {
     id: string;
-    userId: number;
-    planId: string;
-    planName: string;
-    locationId: string;
-    locationName: string;
-    status: SubscriptionStatus;
+    ownerUserId: number;
+    subscriptionPlan: LockerSubscriptionPlan;
+    location: LockerLocationRef;
+    subscriptionStatus: SubscriptionStatus;
     billingCycle: BillingCycle;
     startDate: string;
     endDate: string;
-    nextBillingDate: string;
-    monthlyPrice: number;
-    isAutoRenew: boolean;
-    assignedLockers: AssignedLockerSummary[];
-    features: SubscriptionFeaturesSummary;
-    usageStatistics?: SubscriptionUsageStatistics;
-    createdAt: string;
-    updatedAt?: string;
+    currentUsage: SubscriptionUsageSnapshot;
+    sharedUsers: SharedSubscriptionUser[];
 }
 
-export type SubscriptionAccessType = 'OWNER' | 'SHARED';
-
-export interface AccessibleSubscription {
-    id: string;
-    userId: number;
-    ownerName?: string;
-    planName: string;
-    locationName: string;
-    status: SubscriptionStatus;
-    accessType: SubscriptionAccessType;
-    permissions: string[];
-    sharedBy?: string;
-    sharedDate?: string;
-    assignedLockers: AssignedLockerSummary[];
-}
+export interface AccessibleSubscription extends LockerSubscription {}
 
 export interface ShareSubscriptionRequest {
-    sharedWithUserId?: number;
-    sharedWithEmail?: string;
-    permissions: string[];
-    accessStartDate?: string;
-    accessEndDate?: string;
-    notes?: string;
+    userEmail: string;
+    sharingType: SharingType;
+    allocatedBalance?: number | null;
+    accessLevel: AccessLevel;
+    invitationMessage?: string;
 }
 
 export interface UpdateSharingRequest {
-    permissions?: string[];
-    accessEndDate?: string;
-    notes?: string;
+    allocatedBalance?: number | null;
+    accessLevel?: AccessLevel;
+    sharingStatus?: SharingStatus;
 }
 
 export interface CreateSubscriptionRequest {
     planId: string;
     locationId: string;
     billingCycle: BillingCycle;
-    autoRenew: boolean;
-    paymentMethodId?: string;
+    paymentMethodId: string;
 }
 
 export interface UpgradeSubscriptionRequest {
     newPlanId: string;
-    effectiveImmediately?: boolean;
+    upgradeReason?: string;
 }
 
 export interface CancelSubscriptionResponse {
     success: boolean;
     data: string | null;
+    message: string;
+    errors: string[];
+    timestamp: string;
+}
+
+export interface SubscriptionUsageResponse {
+    success: boolean;
+    data: SubscriptionUsageSnapshot;
     message: string;
     errors: string[];
     timestamp: string;

@@ -33,7 +33,6 @@ const FALLBACK_PLANS: LockerSubscriptionPlan[] = [
         sharingEnabled: true,
         maxSharedUsers: 5,
         description: 'Entry plan with a pair of lockers for light usage.',
-        isActive: true,
     },
     {
         id: 'plan-standard-005',
@@ -46,7 +45,6 @@ const FALLBACK_PLANS: LockerSubscriptionPlan[] = [
         sharingEnabled: true,
         maxSharedUsers: 10,
         description: 'Great for growing teams with moderate reservation needs.',
-        isActive: true,
     },
     {
         id: 'plan-premium-010',
@@ -59,7 +57,6 @@ const FALLBACK_PLANS: LockerSubscriptionPlan[] = [
         sharingEnabled: true,
         maxSharedUsers: 15,
         description: 'High-capacity plan with additional concurrent reservations.',
-        isActive: true,
     },
 ];
 
@@ -126,7 +123,12 @@ class LockerSubscriptionService {
             throw new Error(`Failed to fetch subscriptions: ${response.status}`);
         }
 
-        return response.json();
+        const payload: LockerApiResponse<LockerSubscription[]> = await response.json();
+        if (!payload.success) {
+            throw new Error(payload.message || 'Unable to load subscriptions');
+        }
+
+        return payload;
     }
 
     async getAccessibleSubscriptions(token?: string): Promise<LockerApiResponse<AccessibleSubscription[]>> {
@@ -139,10 +141,18 @@ class LockerSubscriptionService {
             throw new Error(`Failed to fetch accessible subscriptions: ${response.status}`);
         }
 
-        return response.json();
+        const payload: LockerApiResponse<AccessibleSubscription[]> = await response.json();
+        if (!payload.success) {
+            throw new Error(payload.message || 'Unable to load accessible subscriptions');
+        }
+
+        return payload;
     }
 
-    async createSubscription(payload: CreateSubscriptionRequest, token?: string): Promise<LockerApiResponse<LockerSubscription>> {
+    async createSubscription(
+        payload: CreateSubscriptionRequest,
+        token?: string
+    ): Promise<LockerApiResponse<LockerSubscription>> {
         const response = await fetch(`${this.baseUrl}/create`, {
             method: 'POST',
             headers: this.getHeaders(token),
@@ -154,10 +164,19 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to create subscription');
         }
 
-        return response.json();
+        const payloadBody: LockerApiResponse<LockerSubscription> = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to create subscription');
+        }
+
+        return payloadBody;
     }
 
-    async upgradeSubscription(subscriptionId: string, payload: UpgradeSubscriptionRequest, token?: string): Promise<LockerApiResponse<LockerSubscription>> {
+    async upgradeSubscription(
+        subscriptionId: string,
+        payload: UpgradeSubscriptionRequest,
+        token?: string
+    ): Promise<LockerApiResponse<LockerSubscription>> {
         const response = await fetch(`${this.baseUrl}/${subscriptionId}/upgrade`, {
             method: 'PUT',
             headers: this.getHeaders(token),
@@ -169,7 +188,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to upgrade subscription');
         }
 
-        return response.json();
+        const payloadBody: LockerApiResponse<LockerSubscription> = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to upgrade subscription');
+        }
+
+        return payloadBody;
     }
 
     async cancelSubscription(subscriptionId: string, reason: string, token?: string): Promise<CancelSubscriptionResponse> {
@@ -184,7 +208,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to cancel subscription');
         }
 
-        return response.json();
+        const payloadBody: CancelSubscriptionResponse = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to cancel subscription');
+        }
+
+        return payloadBody;
     }
 
     async shareSubscription(subscriptionId: string, payload: ShareSubscriptionRequest, token?: string) {
@@ -199,7 +228,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to share subscription');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to share subscription');
+        }
+
+        return payloadBody;
     }
 
     async getSharedUsers(subscriptionId: string, token?: string) {
@@ -212,7 +246,12 @@ class LockerSubscriptionService {
             throw new Error(`Failed to load shared users: ${response.status}`);
         }
 
-        return response.json();
+        const payload = await response.json();
+        if (!payload.success) {
+            throw new Error(payload.message || 'Failed to load shared users');
+        }
+
+        return payload;
     }
 
     async updateSharing(sharingId: string, payload: UpdateSharingRequest, token?: string) {
@@ -227,7 +266,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to update sharing settings');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to update sharing settings');
+        }
+
+        return payloadBody;
     }
 
     async revokeSharing(sharingId: string, token?: string) {
@@ -241,7 +285,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to revoke sharing');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to revoke sharing');
+        }
+
+        return payloadBody;
     }
 
     async acceptInvitation(invitationToken: string, token?: string) {
@@ -256,7 +305,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to accept invitation');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to accept invitation');
+        }
+
+        return payloadBody;
     }
 
     async rejectInvitation(invitationToken: string, token?: string) {
@@ -271,7 +325,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to reject invitation');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to reject invitation');
+        }
+
+        return payloadBody;
     }
 
     async checkAvailability(subscriptionId: string, requestedFrom: string, requestedUntil: string, token?: string) {
@@ -285,10 +344,15 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to check availability');
         }
 
-        return response.json();
+        const payloadBody = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to check availability');
+        }
+
+        return payloadBody;
     }
 
-    async getUsage(subscriptionId: string, token?: string): Promise<LockerApiResponse<SubscriptionUsageResponse>> {
+    async getUsage(subscriptionId: string, token?: string): Promise<SubscriptionUsageResponse> {
         const response = await fetch(`${this.baseUrl}/${subscriptionId}/usage`, {
             cache: 'no-store',
             headers: this.getHeaders(token),
@@ -299,7 +363,12 @@ class LockerSubscriptionService {
             throw new Error(errorBody?.message || 'Failed to load subscription usage');
         }
 
-        return response.json();
+        const payloadBody: SubscriptionUsageResponse = await response.json();
+        if (!payloadBody.success) {
+            throw new Error(payloadBody.message || 'Failed to load subscription usage');
+        }
+
+        return payloadBody;
     }
 }
 
