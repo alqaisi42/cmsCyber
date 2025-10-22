@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     AccessibleSubscription,
     CreateSubscriptionRequest,
@@ -24,7 +24,6 @@ import { useAuthStore } from '../../contexts/auth-store';
 import { lockerSubscriptionService } from '../../../infrastructure/services/locker-subscription.service';
 import { lockerManagementService } from '../../../infrastructure/services/locker-management.service';
 import {
-    ArrowUpRight,
     CalendarCheck,
     CheckCircle2,
     Clock,
@@ -36,12 +35,15 @@ import {
     Plus,
     RefreshCw,
     ShieldCheck,
+    LifeBuoy,
+    MessageSquare,
     Users,
     X,
     Info,
 } from 'lucide-react';
 import { useToast } from '@/presentation/components/ui/toast';
 import { cn } from '../../../shared/utils/cn';
+import SupportIssuesWorkspace from './support/SupportIssuesWorkspace';
 
 const tabs = [
     { id: 'overview', label: 'Overview', icon: Layers },
@@ -50,6 +52,7 @@ const tabs = [
     { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
     { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+    { id: 'support', label: 'Support & Issues', icon: LifeBuoy },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['id'];
@@ -165,6 +168,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [usageDetails, setUsageDetails] = useState<Record<string, SubscriptionUsageSnapshot>>({});
     const [calendarDetails, setCalendarDetails] = useState<Record<string, FamilyCalendarResponse>>({});
     const [calendarLoading, setCalendarLoading] = useState(false);
+
 
     useEffect(() => {
         setActiveTab(defaultTab);
@@ -893,197 +897,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         </div>
     );
 
-    const renderOverview = () => (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                {summaryMetrics.map((metric) => {
-                    const Icon = metric.icon;
-                    return (
-                        <div key={metric.label} className="bg-white rounded-xl shadow-sm p-5">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-500">{metric.label}</p>
-                                    <p className="text-3xl font-bold text-gray-900 mt-1">{metric.value}</p>
-                                    <p className="text-xs text-gray-400 mt-2">{metric.description}</p>
-                                </div>
-                                <span className={cn('p-3 rounded-full', metric.color)}>
-                                    <Icon className="w-5 h-5" />
-                                </span>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Active Plans</h3>
-                            <p className="text-sm text-gray-500">Quick view of active locker subscriptions</p>
-                        </div>
-                        <button
-                            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                            onClick={() => setActiveTab('subscriptions')}
-                        >
-                            Manage
-                            <ArrowUpRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {activePlansLoading && (
-                            <div className="flex justify-center py-6">
-                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                            </div>
-                        )}
-                        {activePlansError && (
-                            <div className="border border-red-100 bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3">
-                                {activePlansError}
-                            </div>
-                        )}
-                        {!activePlansLoading && !activePlansError && !activePlans.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
-                                No active subscriptions found for this user. Try selecting a different user ID.
-                            </div>
-                        )}
-                        {activePlans.slice(0, 3).map((subscription) => {
-                            const usedLockers = subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
-                            const billingLabel = subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly';
-                            return (
-                                <div key={subscription.id} className="border border-gray-100 rounded-lg p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-semibold text-gray-900">{subscription.subscriptionPlan.planName}</p>
-                                            <p className="text-sm text-gray-500">{subscription.location.name}</p>
-                                        </div>
-                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                                            {subscription.subscriptionStatus}
-                                        </span>
-                                    </div>
-                                    <div className="mt-3 grid grid-cols-3 gap-4 text-xs text-gray-500">
-                                        <div>
-                                            <p className="text-gray-400">Billing</p>
-                                            <p className="font-semibold text-gray-700">{billingLabel}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-400">Usage</p>
-                                            <p className="font-semibold text-gray-700">{usedLockers}/{subscription.currentUsage.totalCapacity} lockers</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-400">Active until</p>
-                                            <p className="font-semibold text-gray-700">{new Date(subscription.endDate).toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Locker Availability</h3>
-                            <p className="text-sm text-gray-500">Monitor available capacity by location</p>
-                        </div>
-                        <button
-                            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                            onClick={() => setActiveTab('lockers')}
-                        >
-                            Explore
-                            <ArrowUpRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {locations.slice(0, 4).map((location) => (
-                            <div key={location.id} className="border border-gray-100 rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold text-gray-900">{location.name}</p>
-                                        <p className="text-xs text-gray-500">{location.address}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-semibold text-emerald-600">{location.availableLockers} free</p>
-                                        <p className="text-xs text-gray-400">of {location.totalLockers} lockers</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {!locations.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
-                                No locations configured yet.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderPlans = () => (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
-                    <p className="text-gray-500">Compare available locker subscriptions and their benefits.</p>
-                </div>
-                <button onClick={() => setPlansMessage('Plans refreshed.')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-                    <RefreshCw className="w-4 h-4" /> Refresh
-                </button>
-            </div>
-            {plansMessage && (
-                <div className="bg-blue-50 text-blue-700 text-sm rounded-lg px-4 py-3">{plansMessage}</div>
-            )}
-            {plansLoading ? (
-                <div className="flex justify-center items-center h-40">
-                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {plans.map((plan) => (
-                        <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
-                            <div className="absolute right-6 top-6">
-                                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                                    {plan.sharingEnabled ? 'Sharing enabled' : 'Sharing disabled'}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
-                                    <Layers className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-semibold text-gray-900">{plan.planName}</h3>
-                                    <p className="text-sm text-gray-500">{plan.description || `Plan code: ${plan.planCode}`}</p>
-                                </div>
-                            </div>
-                            <div className="mt-6 flex items-baseline gap-2">
-                                <p className="text-3xl font-bold text-gray-900">${plan.monthlyPrice}</p>
-                                <span className="text-sm text-gray-400">/ month</span>
-                            </div>
-                            <p className="text-xs text-gray-400">${plan.annualPrice} billed yearly</p>
-                            <ul className="mt-6 space-y-2">
-                                <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Up to {plan.lockerCapacity} lockers
-                                </li>
-                                <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {plan.maxConcurrentReservations} concurrent reservations
-                                </li>
-                                <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                    {plan.sharingEnabled
-                                        ? `Share with up to ${plan.maxSharedUsers} users`
-                                        : 'Sharing disabled'}
-                                </li>
-                                <li className="flex items-center gap-2 text-sm text-gray-600">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Plan code: {plan.planCode}
-                                </li>
-                            </ul>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+    const renderSupport = () => <SupportIssuesWorkspace token={token ?? undefined} />;
 
     const renderSubscriptions = () => (
         <div className="space-y-6">
@@ -2161,6 +1975,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             {activeTab === 'locations' && renderLocationsManagement()}
             {activeTab === 'lockers' && renderLockers()}
             {activeTab === 'reservations' && renderReservations()}
+            {activeTab === 'support' && renderSupport()}
         </div>
     );
 }
