@@ -344,7 +344,7 @@ export class LockerAdminRepository {
             size: locker.size,
             status: locker.status,
             maintenanceStatus: locker.maintenanceStatus,
-            description: locker.description,
+            // description: locker.description,
             isActive: locker.isActive,
             maxCapacity: locker.maxCapacity,
             availableCapacity: locker.availableCapacity,

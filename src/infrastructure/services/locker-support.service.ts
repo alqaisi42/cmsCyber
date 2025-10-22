@@ -66,7 +66,7 @@ export interface LockerIssueFilters {
 }
 
 class LockerSupportService {
-    private readonly baseUrl = '/api/v1/admin/lockers';
+    private readonly baseUrl = '/admin/lockers';
 
     private resolveToken(explicitToken?: string): string | null {
         if (explicitToken) {
