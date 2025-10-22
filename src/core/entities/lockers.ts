@@ -10,7 +10,13 @@ export interface LockerDimensions {
     unit: string;
 }
 
-export type LockerStatus = 'AVAILABLE' | 'RESERVED' | 'MAINTENANCE' | 'INACTIVE';
+export type LockerStatus =
+    | 'AVAILABLE'
+    | 'OCCUPIED'
+    | 'RESERVED'
+    | 'MAINTENANCE'
+    | 'OUT_OF_SERVICE'
+    | 'INACTIVE';
 
 export interface LockerFeature {
     id: string;
@@ -36,6 +42,41 @@ export interface LockerLocation {
     createdAt?: string;
 }
 
+export interface LockerLocationStats {
+    id: string;
+    code: string;
+    name: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    isActive: boolean;
+    totalLockers: number;
+    availableLockers: number;
+    occupiedLockers: number;
+    maintenanceLockers: number;
+    outOfServiceLockers: number;
+    utilizationRate?: number;
+    subscriptions?: Array<{
+        id: string;
+        ownerUserId: number;
+        ownerName: string;
+        subscriptionType: string;
+        subscriptionStatus: string;
+        lockerCount: number;
+        availableLockerCount: number;
+    }>;
+}
+
+export interface LockerLocationTreeNode {
+    id: string;
+    code: string;
+    name: string;
+    type: 'LOCATION' | 'SUBSCRIPTION' | 'LOCKER';
+    lockerCount: number;
+    availableLockerCount: number;
+    children: LockerLocationTreeNode[];
+}
+
 export interface LockerSummary {
     id: string;
     code: string;
@@ -50,15 +91,24 @@ export interface LockerSummary {
     currentReservation?: LockerReservation | null;
     nextAvailableFrom?: string | null;
     isActive?: boolean;
+    maxCapacity?: number;
+    availableCapacity?: number;
+    isCurrentlyAvailable?: boolean;
+    availableTimeSlots?: Array<{
+        startTime: string;
+        endTime: string;
+        isAvailable: boolean;
+    }>;
 }
 
 export interface LockerAvailabilityRequest {
-    userId: number;
+    userId?: number | null;
     locationId: string;
     requiredSize: LockerSize;
     requestedFrom: string;
     requestedUntil: string;
     reservationType?: string;
+    userScope?: 'SPECIFIC_USER' | 'ALL_USERS';
 }
 
 export interface LockerAvailabilityResult {
@@ -83,7 +133,7 @@ export interface LockerAvailabilityResult {
 }
 
 export interface LockerReservationRequest {
-    userId: number;
+    userId?: number | null;
     lockerId: string;
     locationId: string;
     reservedFrom: string;
@@ -91,6 +141,46 @@ export interface LockerReservationRequest {
     reservationType: string;
     orderId?: string;
     notes?: string;
+    userScope?: 'SPECIFIC_USER' | 'ALL_USERS';
+}
+
+export interface LockerIssueSummary {
+    id: string;
+    lockerId: string;
+    lockerCode: string;
+    issueType: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+    title: string;
+    description: string;
+    reportedBy: string;
+    reportedAt: string;
+    assignedTo?: string | null;
+    estimatedResolutionTime?: string | null;
+    attachments?: string[];
+    commentsCount?: number;
+}
+
+export interface LockerMaintenanceSummary {
+    id: string;
+    lockerId: string;
+    maintenanceType: 'PREVENTIVE' | 'CORRECTIVE' | 'EMERGENCY';
+    status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    scheduledDate: string;
+    estimatedDurationHours?: number;
+    assignedTo?: string;
+    notes?: string;
+    completedAt?: string;
+    totalCost?: number;
+}
+
+export interface LockerLocationWithLockers {
+    location: LockerLocation;
+    lockers: LockerSummary[];
+    totalLockers: number;
+    availableLockers: number;
+    maintenanceCount?: number;
+    issueCount?: number;
 }
 
 export interface LockerReservation {

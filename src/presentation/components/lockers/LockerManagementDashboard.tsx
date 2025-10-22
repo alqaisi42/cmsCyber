@@ -7,7 +7,7 @@ import {
     LockerSubscription,
     LockerSubscriptionPlan,
     ShareSubscriptionRequest,
-    SubscriptionUsageResponse,
+    SubscriptionUsageSnapshot,
     UpdateSharingRequest,
 } from '../../../core/entities/locker-subscription';
 import {
@@ -15,6 +15,7 @@ import {
     LockerAvailabilityRequest,
     LockerAvailabilityResult,
     LockerLocation,
+    LockerLocationWithLockers,
     LockerReservation,
     LockerReservationRequest,
     LockerSummary,
@@ -39,12 +40,14 @@ import {
     X,
     Info,
 } from 'lucide-react';
+import { useToast } from '@/presentation/components/ui/toast';
 import { cn } from '../../../shared/utils/cn';
 
 const tabs = [
     { id: 'overview', label: 'Overview', icon: Layers },
     { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
     { id: 'subscriptions', label: 'Subscriptions', icon: Users },
+    { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
     { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
 ] as const;
@@ -65,36 +68,49 @@ const INITIAL_SUBSCRIPTION_FORM: CreateSubscriptionRequest = {
     planId: '',
     locationId: '',
     billingCycle: 'MONTHLY',
-    autoRenew: true,
     paymentMethodId: '',
 };
 
+const INITIAL_SHARING_FORM: ShareSubscriptionRequest = {
+    userEmail: '',
+    sharingType: 'BASIC',
+    allocatedBalance: 1,
+    accessLevel: 'BASIC_ACCESS',
+    invitationMessage: '',
+};
+
 const INITIAL_AVAILABILITY_FORM: LockerAvailabilityRequest = {
-    userId: 0,
+    userId: undefined,
     locationId: '',
     requiredSize: 'MEDIUM',
     requestedFrom: '',
     requestedUntil: '',
     reservationType: 'DELIVERY',
+    userScope: 'SPECIFIC_USER',
 };
 
 const INITIAL_RESERVATION_FORM: LockerReservationRequest = {
-    userId: 0,
+    userId: undefined,
     lockerId: '',
     locationId: '',
     reservedFrom: '',
     reservedUntil: '',
     reservationType: 'DELIVERY',
     notes: '',
+    userScope: 'SPECIFIC_USER',
 };
 
 export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerManagementDashboardProps) {
     const { user, token } = useAuthStore();
     const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
+    const { pushToast } = useToast();
 
     const [plans, setPlans] = useState<LockerSubscriptionPlan[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
     const [plansMessage, setPlansMessage] = useState<string | null>(null);
+    const [activePlans, setActivePlans] = useState<LockerSubscription[]>([]);
+    const [activePlansLoading, setActivePlansLoading] = useState(false);
+    const [activePlansError, setActivePlansError] = useState<string | null>(null);
 
     const [subscriptions, setSubscriptions] = useState<LockerSubscription[]>([]);
     const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
@@ -102,6 +118,9 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
     const [locations, setLocations] = useState<LockerLocation[]>([]);
     const [locationsLoading, setLocationsLoading] = useState(false);
+    const [locationHierarchy, setLocationHierarchy] = useState<LockerLocationWithLockers[]>([]);
+    const [locationHierarchyLoading, setLocationHierarchyLoading] = useState(false);
+    const [locationHierarchyError, setLocationHierarchyError] = useState<string | null>(null);
     const [selectedLocationId, setSelectedLocationId] = useState<string>('');
     const [locationLockers, setLocationLockers] = useState<LockerSummary[]>([]);
     const [accessibleLockers, setAccessibleLockers] = useState<LockerSummary[]>([]);
@@ -113,9 +132,15 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [availabilityForm, setAvailabilityForm] = useState<LockerAvailabilityRequest>(INITIAL_AVAILABILITY_FORM);
     const [availabilityResult, setAvailabilityResult] = useState<LockerAvailabilityResult | null>(null);
     const [availabilityState, setAvailabilityState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [availabilityScope, setAvailabilityScope] = useState<'SPECIFIC_USER' | 'ALL_USERS'>(
+        INITIAL_AVAILABILITY_FORM.userScope || 'SPECIFIC_USER'
+    );
 
     const [reservationForm, setReservationForm] = useState<LockerReservationRequest>(INITIAL_RESERVATION_FORM);
     const [reservationState, setReservationState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [reservationScope, setReservationScope] = useState<'SPECIFIC_USER' | 'ALL_USERS'>(
+        INITIAL_RESERVATION_FORM.userScope || 'SPECIFIC_USER'
+    );
 
     const [createSubscriptionForm, setCreateSubscriptionForm] = useState<CreateSubscriptionRequest>(INITIAL_SUBSCRIPTION_FORM);
     const [createFormOpen, setCreateFormOpen] = useState(false);
@@ -123,9 +148,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
     const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
     const [upgradePlanId, setUpgradePlanId] = useState<string>('');
+    const [upgradeReason, setUpgradeReason] = useState<string>('');
     const [upgradeState, setUpgradeState] = useState<ActionState>({ loading: false, message: null, error: null });
 
-    const [sharingForm, setSharingForm] = useState<ShareSubscriptionRequest>({ permissions: ['VIEW', 'BOOK'] });
+    const [sharingForm, setSharingForm] = useState<ShareSubscriptionRequest>(INITIAL_SHARING_FORM);
     const [sharingState, setSharingState] = useState<ActionState>({ loading: false, message: null, error: null });
 
     const [selectedUserId, setSelectedUserId] = useState<number>(() => {
@@ -136,7 +162,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         return 0;
     });
 
-    const [usageDetails, setUsageDetails] = useState<Record<string, SubscriptionUsageResponse>>({});
+    const [usageDetails, setUsageDetails] = useState<Record<string, SubscriptionUsageSnapshot>>({});
     const [calendarDetails, setCalendarDetails] = useState<Record<string, FamilyCalendarResponse>>({});
     const [calendarLoading, setCalendarLoading] = useState(false);
 
@@ -145,9 +171,26 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [defaultTab]);
 
     useEffect(() => {
-        setAvailabilityForm((prev) => ({ ...prev, userId: selectedUserId }));
-        setReservationForm((prev) => ({ ...prev, userId: selectedUserId }));
-    }, [selectedUserId]);
+        if (availabilityScope === 'SPECIFIC_USER') {
+            setAvailabilityForm((prev) => ({
+                ...prev,
+                userId: selectedUserId || undefined,
+                userScope: 'SPECIFIC_USER',
+            }));
+        }
+        if (reservationScope === 'SPECIFIC_USER') {
+            setReservationForm((prev) => ({
+                ...prev,
+                userId: selectedUserId || undefined,
+                userScope: 'SPECIFIC_USER',
+            }));
+        }
+    }, [selectedUserId, availabilityScope, reservationScope]);
+
+    useEffect(() => {
+        setAvailabilityForm((prev) => ({ ...prev, locationId: selectedLocationId }));
+        setReservationForm((prev) => ({ ...prev, locationId: selectedLocationId }));
+    }, [selectedLocationId]);
 
     useEffect(() => {
         const loadPlans = async () => {
@@ -156,9 +199,21 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 const response = await lockerSubscriptionService.getPlans();
                 setPlans(response.data);
                 setPlansMessage(response.message || null);
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Showing fallback plans',
+                        description: response.message || 'Using cached locker plans while the API is unreachable.',
+                    });
+                }
             } catch (error) {
                 console.error('Failed to load plans:', error);
                 setPlansMessage('Unable to load subscription plans.');
+                pushToast({
+                    type: 'error',
+                    title: 'Failed to load plans',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving plans.',
+                });
             } finally {
                 setPlansLoading(false);
             }
@@ -167,21 +222,59 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         const loadLocations = async () => {
             setLocationsLoading(true);
             try {
-                const response = await lockerManagementService.getLocations();
+                const response = await lockerManagementService.getLocations(token);
                 setLocations(response.data);
-                setLocationsLoading(false);
+                if (response.data.length) {
+                    setSelectedLocationId((prev) => prev || response.data[0].id);
+                }
             } catch (error) {
                 console.error('Failed to load locations:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Failed to load locations',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving locker locations.',
+                });
+            } finally {
                 setLocationsLoading(false);
+            }
+        };
+
+        const loadLocationHierarchy = async () => {
+            setLocationHierarchyLoading(true);
+            setLocationHierarchyError(null);
+            try {
+                const response = await lockerManagementService.getLocationsHierarchy(token);
+                setLocationHierarchy(response.data);
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Limited location data',
+                        description: response.message ||
+                            'Showing cached location structure while the admin API is unavailable.',
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load location hierarchy:', error);
+                const description = error instanceof Error ? error.message : 'Unexpected error retrieving location hierarchy.';
+                setLocationHierarchyError(description);
+                pushToast({
+                    type: 'error',
+                    title: 'Failed to load location hierarchy',
+                    description,
+                });
+            } finally {
+                setLocationHierarchyLoading(false);
             }
         };
 
         loadPlans();
         loadLocations();
-    }, []);
+        loadLocationHierarchy();
+    }, [pushToast, token]);
 
     useEffect(() => {
         if (!token || !selectedUserId) {
+            setActivePlans([]);
             return;
         }
 
@@ -196,6 +289,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 setAccessibleSubscriptions(accessible.data);
             } catch (error) {
                 console.error('Failed to load subscriptions:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load subscriptions',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving subscription data.',
+                });
             } finally {
                 setSubscriptionsLoading(false);
             }
@@ -207,6 +305,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 setAccessibleLockers(response.data);
             } catch (error) {
                 console.error('Failed to load accessible lockers:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load accessible lockers',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving accessible lockers.',
+                });
             }
         };
 
@@ -216,13 +319,66 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 setReservations(response.data);
             } catch (error) {
                 console.error('Failed to load reservations:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load reservations',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving reservation data.',
+                });
             }
         };
 
         loadSubscriptions();
         loadAccessibleLockers();
         loadReservations();
-    }, [token, selectedUserId, reservationStatusFilter]);
+    }, [token, selectedUserId, reservationStatusFilter, pushToast]);
+
+    useEffect(() => {
+        if (!token || !selectedUserId) {
+            setActivePlans([]);
+            setActivePlansError(null);
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadActivePlans = async () => {
+            setActivePlansLoading(true);
+            setActivePlansError(null);
+            try {
+                const response = await lockerManagementService.getActiveSubscriptionsForUser(selectedUserId, token);
+                if (!cancelled) {
+                    setActivePlans(response.data);
+                    if (response.errors?.length) {
+                        pushToast({
+                            type: 'warning',
+                            title: 'Active plans response',
+                            description: response.message || 'Active plan data returned with warnings.',
+                        });
+                    }
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    const description = error instanceof Error ? error.message : 'Unexpected error loading active plans.';
+                    setActivePlansError(description);
+                    pushToast({
+                        type: 'error',
+                        title: 'Failed to load active plans',
+                        description,
+                    });
+                }
+            } finally {
+                if (!cancelled) {
+                    setActivePlansLoading(false);
+                }
+            }
+        };
+
+        loadActivePlans();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [token, selectedUserId, pushToast]);
 
     useEffect(() => {
         if (!selectedLocationId) {
@@ -233,30 +389,77 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
         const loadLocationLockers = async () => {
             try {
-                const response = await lockerManagementService.getLockersByLocation(selectedLocationId);
+                const response = await lockerManagementService.getLockersByLocation(selectedLocationId, token);
                 setLocationLockers(response.data);
             } catch (error) {
                 console.error('Failed to load lockers for location:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load lockers for location',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving lockers for location.',
+                });
             }
         };
 
         const loadAvailable = async () => {
-            if (!selectedUserId) return;
+            const specificUserFallback = selectedUserId ?? availabilityForm.userId ?? reservationForm.userId ?? null;
+            const requiresSpecificUser = availabilityScope === 'SPECIFIC_USER' || reservationScope === 'SPECIFIC_USER';
+            const userContext = requiresSpecificUser ? specificUserFallback : null;
+
+            if (
+                requiresSpecificUser &&
+                (typeof userContext !== 'number' || Number.isNaN(userContext) || userContext <= 0)
+            ) {
+                setAvailableLockers([]);
+                return;
+            }
+
+            const desiredStart = availabilityForm.requestedFrom || reservationForm.reservedFrom || '';
+            const desiredEnd = availabilityForm.requestedUntil || reservationForm.reservedUntil || '';
             try {
-                const response = await lockerManagementService.getAvailableLockersForUser(selectedUserId, selectedLocationId, token);
+                const response = await lockerManagementService.getAvailableLockersForUser(
+                    userContext,
+                    selectedLocationId,
+                    token,
+                    {
+                        size: availabilityForm.requiredSize,
+                        startTime: desiredStart || undefined,
+                        endTime: desiredEnd || undefined,
+                        scope: requiresSpecificUser ? 'SPECIFIC_USER' : 'ALL_USERS',
+                    }
+                );
                 setAvailableLockers(response.data);
             } catch (error) {
                 console.error('Failed to load available lockers for user:', error);
+                pushToast({
+                    type: 'error',
+                    title: 'Unable to load available lockers',
+                    description: error instanceof Error ? error.message : 'Unexpected error retrieving available lockers.',
+                });
             }
         };
 
         loadLocationLockers();
         loadAvailable();
-    }, [selectedLocationId, selectedUserId, token]);
+    }, [
+        selectedLocationId,
+        selectedUserId,
+        token,
+        pushToast,
+        availabilityScope,
+        reservationScope,
+        availabilityForm.userId,
+        reservationForm.userId,
+        availabilityForm.requiredSize,
+        availabilityForm.requestedFrom,
+        availabilityForm.requestedUntil,
+        reservationForm.reservedFrom,
+        reservationForm.reservedUntil,
+    ]);
 
     const summaryMetrics = useMemo(() => {
-        const activeSubscriptions = subscriptions.filter((sub) => sub.status === 'ACTIVE').length;
-        const sharedSubscriptions = accessibleSubscriptions.filter((sub) => sub.accessType === 'SHARED').length;
+        const activeSubscriptions = activePlans.length || subscriptions.filter((sub) => sub.subscriptionStatus === 'ACTIVE').length;
+        const sharedSubscriptions = accessibleSubscriptions.filter((sub) => sub.ownerUserId !== selectedUserId).length;
         const activeReservations = reservations.filter((res) => res.status === 'ACTIVE' || res.status === 'CONFIRMED').length;
         const availableCapacity = locations.reduce((total, loc) => total + loc.availableLockers, 0);
 
@@ -290,140 +493,303 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 color: 'bg-amber-50 text-amber-600',
             },
         ];
-    }, [subscriptions, accessibleSubscriptions, reservations, locations]);
+    }, [subscriptions, accessibleSubscriptions, reservations, locations, selectedUserId]);
 
     const resetCreateForm = () => {
-        setCreateSubscriptionForm({ ...INITIAL_SUBSCRIPTION_FORM, planId: plans[0]?.id || '', locationId: locations[0]?.id || '' });
+        setCreateSubscriptionForm({
+            ...INITIAL_SUBSCRIPTION_FORM,
+            planId: plans[0]?.id || '',
+            locationId: locations[0]?.id || '',
+        });
         setCreateFormOpen(false);
     };
 
     const handleCreateSubscription = async () => {
         if (!token) {
-            setCreateState({ loading: false, message: null, error: 'Authentication token required to create subscriptions.' });
+            const description = 'Authentication token required to create subscriptions.';
+            setCreateState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Not authenticated', description });
             return;
         }
 
-        if (!createSubscriptionForm.planId || !createSubscriptionForm.locationId) {
-            setCreateState({ loading: false, message: null, error: 'Please select a plan and location.' });
+        if (!createSubscriptionForm.planId || !createSubscriptionForm.locationId || !createSubscriptionForm.paymentMethodId) {
+            const description = 'Select a plan, location, and payment method before creating a subscription.';
+            setCreateState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Missing information', description });
             return;
         }
 
         setCreateState({ loading: true, message: null, error: null });
         try {
-            await lockerSubscriptionService.createSubscription(createSubscriptionForm, token);
-            setCreateState({ loading: false, message: 'Subscription created successfully.', error: null });
-            const response = await lockerSubscriptionService.getMySubscriptions(token);
-            setSubscriptions(response.data);
+            const creationResult = await lockerSubscriptionService.createSubscription(createSubscriptionForm, token);
+            setCreateState({ loading: false, message: creationResult.message || 'Subscription created successfully.', error: null });
+            const mySubscriptions = await lockerSubscriptionService.getMySubscriptions(token);
+            setSubscriptions(mySubscriptions.data);
             resetCreateForm();
+            pushToast({
+                type: 'success',
+                title: 'Subscription created',
+                description: 'Your locker subscription is now active.',
+            });
         } catch (error) {
-            setCreateState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to create subscription.' });
+            const description = error instanceof Error ? error.message : 'Failed to create subscription.';
+            setCreateState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Unable to create subscription', description });
         }
     };
 
     const handleUpgradeSubscription = async (subscriptionId: string) => {
         if (!token) {
-            setUpgradeState({ loading: false, message: null, error: 'Authentication token required to upgrade subscriptions.' });
+            const description = 'Authentication token required to upgrade subscriptions.';
+            setUpgradeState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Not authenticated', description });
             return;
         }
         if (!upgradePlanId) {
-            setUpgradeState({ loading: false, message: null, error: 'Select the new plan to upgrade to.' });
+            const description = 'Select the new plan to upgrade to.';
+            setUpgradeState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Select a plan', description });
+            return;
+        }
+        if (!upgradeReason.trim()) {
+            const description = 'Provide a reason for the upgrade so billing can be audited.';
+            setUpgradeState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Upgrade reason required', description });
             return;
         }
         setUpgradeState({ loading: true, message: null, error: null });
         try {
-            await lockerSubscriptionService.upgradeSubscription(subscriptionId, { newPlanId: upgradePlanId, effectiveImmediately: true }, token);
-            setUpgradeState({ loading: false, message: 'Subscription upgraded successfully.', error: null });
-            const response = await lockerSubscriptionService.getMySubscriptions(token);
-            setSubscriptions(response.data);
+            const upgradeResult = await lockerSubscriptionService.upgradeSubscription(
+                subscriptionId,
+                { newPlanId: upgradePlanId, upgradeReason: upgradeReason.trim() },
+                token
+            );
+            setUpgradeState({ loading: false, message: upgradeResult.message || 'Subscription upgraded successfully.', error: null });
+            const mySubscriptions = await lockerSubscriptionService.getMySubscriptions(token);
+            setSubscriptions(mySubscriptions.data);
             setUpgradePlanId('');
+            setUpgradeReason('');
+            pushToast({
+                type: 'success',
+                title: 'Subscription upgraded',
+                description: upgradeResult.message || 'Plan upgraded successfully.',
+            });
         } catch (error) {
-            setUpgradeState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to upgrade subscription.' });
+            const description = error instanceof Error ? error.message : 'Failed to upgrade subscription.';
+            setUpgradeState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Unable to upgrade subscription', description });
         }
     };
 
     const handleCancelSubscription = async (subscriptionId: string) => {
         if (!token) {
-            alert('Authentication token required to cancel subscriptions.');
+            pushToast({
+                type: 'error',
+                title: 'Not authenticated',
+                description: 'Authentication token required to cancel subscriptions.',
+            });
             return;
         }
         const reason = prompt('Please provide a cancellation reason');
-        if (!reason) return;
+        if (!reason || !reason.trim()) {
+            pushToast({
+                type: 'warning',
+                title: 'Cancellation aborted',
+                description: 'A cancellation reason is required to proceed.',
+            });
+            return;
+        }
 
         try {
-            await lockerSubscriptionService.cancelSubscription(subscriptionId, reason, token);
-            const response = await lockerSubscriptionService.getMySubscriptions(token);
-            setSubscriptions(response.data);
-            alert('Subscription cancelled successfully.');
+            const cancelResult = await lockerSubscriptionService.cancelSubscription(subscriptionId, reason.trim(), token);
+            const mySubscriptions = await lockerSubscriptionService.getMySubscriptions(token);
+            setSubscriptions(mySubscriptions.data);
+            pushToast({
+                type: 'success',
+                title: 'Subscription cancelled',
+                description: cancelResult.message || 'Subscription canceled successfully.',
+            });
         } catch (error) {
-            alert(error instanceof Error ? error.message : 'Failed to cancel subscription.');
+            pushToast({
+                type: 'error',
+                title: 'Unable to cancel subscription',
+                description: error instanceof Error ? error.message : 'Failed to cancel subscription.',
+            });
         }
     };
 
     const handleShareSubscription = async (subscriptionId: string) => {
         if (!token) {
-            setSharingState({ loading: false, message: null, error: 'Authentication token required to share subscriptions.' });
+            const description = 'Authentication token required to share subscriptions.';
+            setSharingState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Not authenticated', description });
             return;
         }
-        if (!sharingForm.sharedWithUserId && !sharingForm.sharedWithEmail) {
-            setSharingState({ loading: false, message: null, error: 'Provide a user ID or email to share with.' });
+        if (!sharingForm.userEmail.trim()) {
+            const description = 'Enter the email address of the person you want to invite.';
+            setSharingState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Email required', description });
+            return;
+        }
+
+        if (
+            sharingForm.sharingType === 'BASIC' &&
+            (!sharingForm.allocatedBalance || sharingForm.allocatedBalance <= 0)
+        ) {
+            const description = 'Allocated balance must be greater than 0 for BASIC sharing.';
+            setSharingState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Adjust allocated balance', description });
+            return;
+        }
+
+        const payload: ShareSubscriptionRequest = {
+            ...sharingForm,
+            allocatedBalance:
+                sharingForm.sharingType === 'OWNER' ? null : sharingForm.allocatedBalance,
+            invitationMessage: sharingForm.invitationMessage?.trim() || undefined,
+            userEmail: sharingForm.userEmail.trim(),
+        };
+
+        if (payload.sharingType === 'OWNER') {
+            payload.allocatedBalance = null;
+        }
+
+        if (payload.sharingType === 'BASIC' && !payload.allocatedBalance) {
+            payload.allocatedBalance = 1;
+        }
+
+        if (payload.sharingType === 'OWNER' && payload.accessLevel === 'BASIC_ACCESS') {
+            payload.accessLevel = 'FULL_ACCESS';
+        }
+
+        if (payload.sharingType === 'BASIC' && payload.accessLevel === 'FULL_ACCESS') {
+            const description = 'Basic sharing cannot grant full access. Choose Basic access level or switch to Owner sharing.';
+            setSharingState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Invalid access level', description });
             return;
         }
 
         setSharingState({ loading: true, message: null, error: null });
         try {
-            await lockerSubscriptionService.shareSubscription(subscriptionId, sharingForm, token);
-            setSharingState({ loading: false, message: 'Invitation sent successfully.', error: null });
-            setSharingForm({ permissions: ['VIEW', 'BOOK'] });
+            const shareResult = await lockerSubscriptionService.shareSubscription(subscriptionId, payload, token);
+            setSharingState({ loading: false, message: shareResult.message || 'Invitation sent successfully.', error: null });
+            setSharingForm(INITIAL_SHARING_FORM);
+            pushToast({
+                type: 'success',
+                title: 'Invitation sent',
+                description: shareResult.message || 'The user will receive an email with next steps.',
+            });
         } catch (error) {
-            setSharingState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to share subscription.' });
+            const description = error instanceof Error ? error.message : 'Failed to share subscription.';
+            setSharingState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Unable to share subscription', description });
         }
     };
 
     const handleCheckAvailability = async () => {
-        if (!availabilityForm.userId || !availabilityForm.locationId || !availabilityForm.requestedFrom || !availabilityForm.requestedUntil) {
-            setAvailabilityState({ loading: false, message: null, error: 'Complete all fields to check availability.' });
+        const requiresUser = availabilityScope === 'SPECIFIC_USER';
+        if (
+            !availabilityForm.locationId ||
+            !availabilityForm.requestedFrom ||
+            !availabilityForm.requestedUntil ||
+            (requiresUser && !availabilityForm.userId)
+        ) {
+            const description = 'Complete all fields to check availability.';
+            setAvailabilityState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Missing information', description });
             return;
         }
         setAvailabilityState({ loading: true, message: null, error: null });
         try {
-            const response = await lockerManagementService.checkLockerAvailability(availabilityForm, token);
-            setAvailabilityResult(response.data);
-            setAvailabilityState({ loading: false, message: response.message, error: null });
+            const payload: LockerAvailabilityRequest = {
+                ...availabilityForm,
+                userScope: availabilityScope,
+                userId: requiresUser ? availabilityForm.userId : undefined,
+            };
+            const availabilityResponse = await lockerManagementService.checkLockerAvailability(payload, token);
+            setAvailabilityResult(availabilityResponse.data);
+            setAvailabilityState({ loading: false, message: availabilityResponse.message, error: null });
+            pushToast({
+                type: availabilityResponse.data.isAvailable ? 'success' : 'info',
+                title: availabilityResponse.data.isAvailable ? 'Lockers available' : 'Lockers unavailable',
+                description: availabilityResponse.message ||
+                    (availabilityResponse.data.isAvailable
+                        ? 'A locker is available for the requested time range.'
+                        : availabilityResponse.data.reason || 'No lockers available for that slot.'),
+            });
         } catch (error) {
             setAvailabilityResult(null);
-            setAvailabilityState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to check availability.' });
+            const description = error instanceof Error ? error.message : 'Failed to check availability.';
+            setAvailabilityState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Unable to check availability', description });
         }
     };
 
     const handleReserveLocker = async () => {
-        if (!reservationForm.userId || !reservationForm.lockerId || !reservationForm.locationId || !reservationForm.reservedFrom || !reservationForm.reservedUntil) {
-            setReservationState({ loading: false, message: null, error: 'Complete all required fields to reserve a locker.' });
+        const requiresUser = reservationScope === 'SPECIFIC_USER';
+        if (
+            !reservationForm.lockerId ||
+            !reservationForm.locationId ||
+            !reservationForm.reservedFrom ||
+            !reservationForm.reservedUntil ||
+            (requiresUser && !reservationForm.userId)
+        ) {
+            const description = 'Complete all required fields to reserve a locker.';
+            setReservationState({ loading: false, message: null, error: description });
+            pushToast({ type: 'warning', title: 'Missing information', description });
             return;
         }
         setReservationState({ loading: true, message: null, error: null });
         try {
-            const response = await lockerManagementService.reserveLocker(reservationForm, token);
-            setReservationState({ loading: false, message: response.message || 'Locker reserved successfully.', error: null });
+            const payload: LockerReservationRequest = {
+                ...reservationForm,
+                userScope: reservationScope,
+                userId: requiresUser ? reservationForm.userId : undefined,
+            };
+            const reservationResponse = await lockerManagementService.reserveLocker(payload, token);
+            setReservationState({ loading: false, message: reservationResponse.message || 'Locker reserved successfully.', error: null });
             if (selectedUserId) {
                 const reservationsResponse = await lockerManagementService.getReservationsForUser(selectedUserId, reservationStatusFilter, token);
                 setReservations(reservationsResponse.data);
             }
+            pushToast({
+                type: 'success',
+                title: 'Locker reserved',
+                description: reservationResponse.message || 'Reservation confirmed successfully.',
+            });
         } catch (error) {
-            setReservationState({ loading: false, message: null, error: error instanceof Error ? error.message : 'Failed to reserve locker.' });
+            const description = error instanceof Error ? error.message : 'Failed to reserve locker.';
+            setReservationState({ loading: false, message: null, error: description });
+            pushToast({ type: 'error', title: 'Unable to reserve locker', description });
         }
     };
 
     const handleExtendReservation = async (reservationId: string) => {
         if (!selectedUserId) return;
         const newEndTime = prompt('New end time (ISO format, e.g. 2025-10-22T16:00:00)');
-        if (!newEndTime) return;
+        if (!newEndTime) {
+            pushToast({
+                type: 'warning',
+                title: 'Extension cancelled',
+                description: 'Reservation extension aborted because no end time was provided.',
+            });
+            return;
+        }
         try {
             await lockerManagementService.extendReservation(reservationId, selectedUserId, newEndTime, token);
             const response = await lockerManagementService.getReservationsForUser(selectedUserId, reservationStatusFilter, token);
             setReservations(response.data);
-            alert('Reservation extended.');
+            pushToast({
+                type: 'success',
+                title: 'Reservation extended',
+                description: 'Reservation end time updated successfully.',
+            });
         } catch (error) {
-            alert(error instanceof Error ? error.message : 'Failed to extend reservation.');
+            pushToast({
+                type: 'error',
+                title: 'Unable to extend reservation',
+                description: error instanceof Error ? error.message : 'Failed to extend reservation.',
+            });
         }
     };
 
@@ -433,9 +799,17 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             await lockerManagementService.cancelReservation(reservationId, selectedUserId, token);
             const response = await lockerManagementService.getReservationsForUser(selectedUserId, reservationStatusFilter, token);
             setReservations(response.data);
-            alert('Reservation cancelled successfully.');
+            pushToast({
+                type: 'success',
+                title: 'Reservation cancelled',
+                description: 'Locker reservation cancelled successfully.',
+            });
         } catch (error) {
-            alert(error instanceof Error ? error.message : 'Failed to cancel reservation.');
+            pushToast({
+                type: 'error',
+                title: 'Unable to cancel reservation',
+                description: error instanceof Error ? error.message : 'Failed to cancel reservation.',
+            });
         }
     };
 
@@ -446,6 +820,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             setUsageDetails((prev) => ({ ...prev, [subscriptionId]: response.data }));
         } catch (error) {
             console.error('Failed to load usage stats:', error);
+            pushToast({
+                type: 'error',
+                title: 'Unable to load usage stats',
+                description: error instanceof Error ? error.message : 'Failed to load subscription usage.',
+            });
         }
     };
 
@@ -466,6 +845,11 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             setCalendarDetails((prev) => ({ ...prev, [subscriptionId]: response.data }));
         } catch (error) {
             console.error('Failed to load family calendar:', error);
+            pushToast({
+                type: 'error',
+                title: 'Unable to load reservation calendar',
+                description: error instanceof Error ? error.message : 'Failed to load locker reservation calendar.',
+            });
         } finally {
             setCalendarLoading(false);
         }
@@ -531,38 +915,52 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {subscriptions.slice(0, 3).map((subscription) => (
-                            <div key={subscription.id} className="border border-gray-100 rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold text-gray-900">{subscription.planName}</p>
-                                        <p className="text-sm text-gray-500">{subscription.locationName}</p>
-                                    </div>
-                                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                                        {subscription.status}
-                                    </span>
-                                </div>
-                                <div className="mt-3 grid grid-cols-3 gap-4 text-xs text-gray-500">
-                                    <div>
-                                        <p className="text-gray-400">Billing</p>
-                                        <p className="font-semibold text-gray-700">{subscription.billingCycle}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-400">Lockers</p>
-                                        <p className="font-semibold text-gray-700">{subscription.assignedLockers.length}/{subscription.features.maxLockers}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-400">Next billing</p>
-                                        <p className="font-semibold text-gray-700">{new Date(subscription.nextBillingDate).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {!subscriptions.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
-                                No subscriptions yet. Create one to start assigning lockers.
+                        {activePlansLoading && (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                             </div>
                         )}
+                        {activePlansError && (
+                            <div className="border border-red-100 bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3">
+                                {activePlansError}
+                            </div>
+                        )}
+                        {!activePlansLoading && !activePlansError && !activePlans.length && (
+                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                                No active subscriptions found for this user. Try selecting a different user ID.
+                            </div>
+                        )}
+                        {activePlans.slice(0, 3).map((subscription) => {
+                            const usedLockers = subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
+                            const billingLabel = subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly';
+                            return (
+                                <div key={subscription.id} className="border border-gray-100 rounded-lg p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{subscription.subscriptionPlan.planName}</p>
+                                            <p className="text-sm text-gray-500">{subscription.location.name}</p>
+                                        </div>
+                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                            {subscription.subscriptionStatus}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-3 gap-4 text-xs text-gray-500">
+                                        <div>
+                                            <p className="text-gray-400">Billing</p>
+                                            <p className="font-semibold text-gray-700">{billingLabel}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400">Usage</p>
+                                            <p className="font-semibold text-gray-700">{usedLockers}/{subscription.currentUsage.totalCapacity} lockers</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400">Active until</p>
+                                            <p className="font-semibold text-gray-700">{new Date(subscription.endDate).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -630,7 +1028,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
                             <div className="absolute right-6 top-6">
                                 <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                                    {plan.isActive === false ? 'Archived' : 'Active'}
+                                    {plan.sharingEnabled ? 'Sharing enabled' : 'Sharing disabled'}
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -770,7 +1168,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="MONTHLY">Monthly</option>
-                                <option value="YEARLY">Yearly</option>
+                                <option value="ANNUAL">Annual</option>
                             </select>
                         </div>
                         <div>
@@ -782,18 +1180,6 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 placeholder="Payment method reference"
                                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                id="autoRenew"
-                                type="checkbox"
-                                checked={createSubscriptionForm.autoRenew}
-                                onChange={(event) => setCreateSubscriptionForm((prev) => ({ ...prev, autoRenew: event.target.checked }))}
-                                className="h-4 w-4 text-blue-600"
-                            />
-                            <label htmlFor="autoRenew" className="text-sm text-gray-600">
-                                Enable automatic renewal
-                            </label>
                         </div>
                     </div>
                     <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -831,14 +1217,26 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-lg font-semibold text-gray-900">{subscription.planName}</h3>
-                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">{subscription.status}</span>
+                                                <h3 className="text-lg font-semibold text-gray-900">{subscription.subscriptionPlan.planName}</h3>
+                                                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">{subscription.subscriptionStatus}</span>
                                             </div>
-                                            <p className="text-sm text-gray-500">{subscription.locationName}</p>
+                                            <p className="text-sm text-gray-500">
+                                                {subscription.location.name}
+                                                {subscription.location.address ? ` · ${subscription.location.address}` : ''}
+                                            </p>
                                             <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-500">
-                                                <span>Billing: <strong>{subscription.billingCycle}</strong></span>
-                                                <span>Monthly: <strong>${subscription.monthlyPrice}</strong></span>
-                                                <span>Auto renew: <strong>{subscription.isAutoRenew ? 'Yes' : 'No'}</strong></span>
+                                                <span>
+                                                    Billing: <strong>{subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly'}</strong>
+                                                </span>
+                                                <span>
+                                                    Capacity: <strong>{subscription.subscriptionPlan.lockerCapacity} lockers</strong>
+                                                </span>
+                                                <span>
+                                                    Active reservations: <strong>{subscription.currentUsage.activeReservations}</strong>
+                                                </span>
+                                                <span>
+                                                    Available capacity: <strong>{subscription.currentUsage.availableCapacity}</strong>
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
@@ -847,6 +1245,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                 onClick={() => {
                                                     setExpandedSubscriptionId(isExpanded ? null : subscription.id);
                                                     setUpgradePlanId('');
+                                                    setUpgradeReason('');
                                                 }}
                                             >
                                                 {isExpanded ? 'Hide details' : 'View details'}
@@ -856,6 +1255,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                 onClick={() => {
                                                     setExpandedSubscriptionId(subscription.id);
                                                     setUpgradeState({ loading: false, message: null, error: null });
+                                                    setUpgradeReason('');
                                                 }}
                                             >
                                                 Upgrade
@@ -873,26 +1273,38 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         <div className="border-t border-gray-100 pt-4 space-y-4">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div className="border border-gray-100 rounded-lg p-4">
-                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Assigned lockers</h4>
-                                                    <div className="space-y-2">
-                                                        {subscription.assignedLockers.length ? (
-                                                            subscription.assignedLockers.map((locker) => (
-                                                                <div key={locker.lockerId} className="flex items-center justify-between text-sm text-gray-600">
-                                                                    <span>{locker.lockerNumber} · {locker.size}</span>
-                                                                    <span className="text-xs text-gray-400">{locker.isAvailable ? 'Available' : 'In use'}</span>
+                                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">Usage by member</h4>
+                                                    <div className="space-y-3">
+                                                        {subscription.currentUsage.usageByUser.length ? (
+                                                            subscription.currentUsage.usageByUser.map((usageItem) => (
+                                                                <div key={usageItem.userId} className="flex items-center justify-between text-sm text-gray-600">
+                                                                    <div>
+                                                                        <p className="font-semibold text-gray-800">{usageItem.userName}</p>
+                                                                        <p className="text-xs text-gray-400">
+                                                                            {usageItem.sharingType === 'OWNER' ? 'Owner access' : 'Shared access'} · Active reservations: {usageItem.activeReservations}
+                                                                        </p>
+                                                                    </div>
+                                                                    {usageItem.allocatedBalance !== null && (
+                                                                        <span className="text-xs text-gray-500">Balance: {usageItem.allocatedBalance}</span>
+                                                                    )}
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <p className="text-sm text-gray-400">No lockers assigned yet.</p>
+                                                            <p className="text-sm text-gray-400">Usage data not available.</p>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <div className="border border-gray-100 rounded-lg p-4">
                                                     <h4 className="text-sm font-semibold text-gray-800 mb-2">Plan features</h4>
                                                     <div className="text-xs text-gray-500 space-y-1">
-                                                        <p>Max lockers: <strong>{subscription.features.maxLockers}</strong></p>
-                                                        <p>Sharing: <strong>{subscription.features.allowSharing ? `Up to ${subscription.features.maxSharedUsers}` : 'Disabled'}</strong></p>
-                                                        <p>Current shared users: <strong>{subscription.features.currentSharedUsers || 0}</strong></p>
+                                                        <p>Locker capacity: <strong>{subscription.subscriptionPlan.lockerCapacity}</strong></p>
+                                                        <p>Concurrent reservations: <strong>{subscription.subscriptionPlan.maxConcurrentReservations}</strong></p>
+                                                        <p>
+                                                            Sharing: <strong>{subscription.subscriptionPlan.sharingEnabled ? `Up to ${subscription.subscriptionPlan.maxSharedUsers} shared users` : 'Disabled'}</strong>
+                                                        </p>
+                                                        <p>
+                                                            Available capacity: <strong>{subscription.currentUsage.availableCapacity} / {subscription.currentUsage.totalCapacity}</strong>
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -906,11 +1318,21 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                         onChange={(event) => setUpgradePlanId(event.target.value)}
                                                     >
                                                         <option value="">Select new plan</option>
-                                                        {plans.filter((plan) => plan.id !== subscription.planId).map((plan) => (
+                                                        {plans.filter((plan) => plan.id !== subscription.subscriptionPlan.id).map((plan) => (
                                                             <option key={plan.id} value={plan.id}>{plan.planName}</option>
                                                         ))}
                                                     </select>
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex-1">
+                                                        <label className="text-xs text-gray-500">Reason for upgrade</label>
+                                                        <textarea
+                                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            rows={2}
+                                                            value={upgradeReason}
+                                                            onChange={(event) => setUpgradeReason(event.target.value)}
+                                                            placeholder="Explain why this subscription needs more capacity"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-3 self-start lg:self-auto">
                                                         {upgradeState.error && <span className="text-sm text-red-600">{upgradeState.error}</span>}
                                                         {upgradeState.message && <span className="text-sm text-emerald-600">{upgradeState.message}</span>}
                                                         <button
@@ -926,54 +1348,90 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
                                             <div className="border border-gray-100 rounded-lg p-4">
                                                 <h4 className="text-sm font-semibold text-gray-800 mb-3">Share access</h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                                     <div>
-                                                        <label className="text-xs text-gray-500">User ID</label>
-                                                        <input
-                                                            type="number"
-                                                            value={sharingForm.sharedWithUserId || ''}
-                                                            onChange={(event) => setSharingForm((prev) => ({
-                                                                ...prev,
-                                                                sharedWithUserId: event.target.value ? Number(event.target.value) : undefined,
-                                                            }))}
-                                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                                                            placeholder="User ID"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-xs text-gray-500">Email</label>
+                                                        <label className="text-xs text-gray-500">Invitee email</label>
                                                         <input
                                                             type="email"
-                                                            value={sharingForm.sharedWithEmail || ''}
-                                                            onChange={(event) => setSharingForm((prev) => ({
-                                                                ...prev,
-                                                                sharedWithEmail: event.target.value || undefined,
-                                                            }))}
+                                                            value={sharingForm.userEmail}
+                                                            onChange={(event) => setSharingForm((prev) => ({ ...prev, userEmail: event.target.value }))}
                                                             className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                                                             placeholder="user@example.com"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-xs text-gray-500">Permissions</label>
+                                                        <label className="text-xs text-gray-500">Sharing type</label>
                                                         <select
-                                                            multiple
-                                                            value={sharingForm.permissions}
+                                                            value={sharingForm.sharingType}
                                                             onChange={(event) => {
-                                                                const selected = Array.from(event.target.selectedOptions).map((option) => option.value);
-                                                                setSharingForm((prev) => ({ ...prev, permissions: selected }));
+                                                                const newType = event.target.value as ShareSubscriptionRequest['sharingType'];
+                                                                setSharingForm((prev) => ({
+                                                                    ...prev,
+                                                                    sharingType: newType,
+                                                                    allocatedBalance: newType === 'OWNER' ? null : prev.allocatedBalance ?? 1,
+                                                                    accessLevel:
+                                                                        newType === 'OWNER'
+                                                                            ? 'FULL_ACCESS'
+                                                                            : prev.accessLevel === 'FULL_ACCESS'
+                                                                                ? 'BASIC_ACCESS'
+                                                                                : prev.accessLevel,
+                                                                }));
                                                             }}
-                                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm h-24"
+                                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                                                         >
-                                                            {['VIEW', 'BOOK', 'EXTEND', 'MANAGE', 'CANCEL', 'SHARE'].map((permission) => (
-                                                                <option key={permission} value={permission}>{permission}</option>
-                                                            ))}
+                                                            <option value="BASIC">Basic</option>
+                                                            <option value="OWNER">Owner</option>
                                                         </select>
                                                     </div>
+                                                    {sharingForm.sharingType === 'BASIC' && (
+                                                        <div>
+                                                            <label className="text-xs text-gray-500">Allocated balance</label>
+                                                            <input
+                                                                type="number"
+                                                                min={1}
+                                                                value={sharingForm.allocatedBalance ?? 1}
+                                                                onChange={(event) =>
+                                                                    setSharingForm((prev) => ({
+                                                                        ...prev,
+                                                                        allocatedBalance: Number(event.target.value) > 0 ? Number(event.target.value) : 1,
+                                                                    }))
+                                                                }
+                                                                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                                placeholder="e.g. 2"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <label className="text-xs text-gray-500">Access level</label>
+                                                        <select
+                                                            value={sharingForm.accessLevel}
+                                                            onChange={(event) =>
+                                                                setSharingForm((prev) => ({
+                                                                    ...prev,
+                                                                    accessLevel: event.target.value as ShareSubscriptionRequest['accessLevel'],
+                                                                }))
+                                                            }
+                                                            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                                        >
+                                                            <option value="BASIC_ACCESS" disabled={sharingForm.sharingType === 'OWNER'}>Basic locker access</option>
+                                                            <option value="FULL_ACCESS">Full management access</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3">
+                                                    <label className="text-xs text-gray-500">Invitation message</label>
+                                                    <textarea
+                                                        className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        rows={3}
+                                                        value={sharingForm.invitationMessage || ''}
+                                                        onChange={(event) => setSharingForm((prev) => ({ ...prev, invitationMessage: event.target.value }))}
+                                                        placeholder="Hi! I’d like to share locker access with you."
+                                                    />
                                                 </div>
                                                 <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                                     <div className="flex items-center gap-2 text-xs text-gray-500">
                                                         <Info className="w-4 h-4 text-blue-500" />
-                                                        Invitees will receive email instructions to access lockers.
+                                                        Invitees will receive an email with their access instructions.
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         {sharingState.error && <span className="text-sm text-red-600">{sharingState.error}</span>}
@@ -1002,10 +1460,18 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                                     </div>
                                                     {usage ? (
                                                         <div className="text-xs text-gray-600 space-y-2">
-                                                            <p>Reservations this month: <strong>{usage.reservationUsage.reservationsThisMonth}/{usage.reservationUsage.maxReservationsPerMonth}</strong></p>
-                                                            <p>Utilisation rate: <strong>{usage.reservationUsage.utilizationRate}%</strong></p>
-                                                            <p>Active shared users: <strong>{usage.sharingUsage.activeSharedUsers}/{usage.sharingUsage.maxSharedUsers}</strong></p>
-                                                            <p>Monthly charge: <strong>${usage.financialSummary.monthlyCharge}</strong></p>
+                                                            <p>Active reservations: <strong>{usage.activeReservations}</strong></p>
+                                                            <p>Available lockers: <strong>{usage.availableCapacity}</strong></p>
+                                                            <p>Total capacity: <strong>{usage.totalCapacity}</strong></p>
+                                                            <div className="mt-2 space-y-1">
+                                                                <p className="text-xs font-semibold text-gray-700">Top members</p>
+                                                                {(usage.usageByUser ?? []).slice(0, 3).map((member) => (
+                                                                    <p key={member.userId} className="text-gray-500">
+                                                                        {member.userName} · {member.activeReservations} active{member.allocatedBalance !== null ? ` · balance ${member.allocatedBalance}` : ''}
+                                                                    </p>
+                                                                ))}
+                                                                {!usage.usageByUser.length && <p className="text-gray-400">No usage recorded yet.</p>}
+                                                            </div>
                                                         </div>
                                                     ) : (
                                                         <p className="text-xs text-gray-400">Click refresh to load usage analytics.</p>
@@ -1063,12 +1529,12 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         {accessibleSubscriptions.map((subscription) => (
                             <div key={subscription.id} className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-900">{subscription.planName} · {subscription.locationName}</p>
-                                    <p className="text-xs text-gray-500">Access: {subscription.accessType}</p>
-                                    <p className="text-xs text-gray-400">Permissions: {subscription.permissions.join(', ')}</p>
+                                    <p className="text-sm font-semibold text-gray-900">{subscription.subscriptionPlan.planName} · {subscription.location.name}</p>
+                                    <p className="text-xs text-gray-500">Status: {subscription.subscriptionStatus}</p>
+                                    <p className="text-xs text-gray-400">Available capacity: {subscription.currentUsage.availableCapacity}/{subscription.currentUsage.totalCapacity}</p>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <ShieldCheck className="w-4 h-4 text-emerald-500" /> Shared by {subscription.ownerName || 'Unknown'}
+                                    <ShieldCheck className="w-4 h-4 text-emerald-500" /> Owner ID #{subscription.ownerUserId}
                                 </div>
                             </div>
                         ))}
@@ -1193,6 +1659,67 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <Clock className="w-5 h-5 text-blue-600" />
                         </div>
                         <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                                <button
+                                    onClick={() => {
+                                        setAvailabilityScope('SPECIFIC_USER');
+                                        setAvailabilityForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'SPECIFIC_USER',
+                                            userId: selectedUserId || prev.userId || undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        availabilityScope === 'SPECIFIC_USER'
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    Specific user
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setAvailabilityScope('ALL_USERS');
+                                        setAvailabilityForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'ALL_USERS',
+                                            userId: undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        availabilityScope === 'ALL_USERS'
+                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    All users
+                                </button>
+                            </div>
+                            {availabilityScope === 'SPECIFIC_USER' ? (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 mb-1 block">User ID</label>
+                                    <input
+                                        type="number"
+                                        value={availabilityForm.userId ?? ''}
+                                        onChange={(event) =>
+                                            setAvailabilityForm((prev) => ({
+                                                ...prev,
+                                                userId: event.target.value ? Number(event.target.value) : undefined,
+                                            }))
+                                        }
+                                        placeholder="Enter user ID"
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500">
+                                    Checking availability across all members with access to this location.
+                                </p>
+                            )}
                             <input
                                 type="datetime-local"
                                 value={availabilityForm.requestedFrom}
@@ -1244,6 +1771,67 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                         <h3 className="text-lg font-semibold text-gray-900 mb-3">Reserve locker</h3>
                         <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                                <button
+                                    onClick={() => {
+                                        setReservationScope('SPECIFIC_USER');
+                                        setReservationForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'SPECIFIC_USER',
+                                            userId: selectedUserId || prev.userId || undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        reservationScope === 'SPECIFIC_USER'
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    Specific user
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setReservationScope('ALL_USERS');
+                                        setReservationForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'ALL_USERS',
+                                            userId: undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        reservationScope === 'ALL_USERS'
+                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    All users
+                                </button>
+                            </div>
+                            {reservationScope === 'SPECIFIC_USER' ? (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 mb-1 block">User ID</label>
+                                    <input
+                                        type="number"
+                                        value={reservationForm.userId ?? ''}
+                                        onChange={(event) =>
+                                            setReservationForm((prev) => ({
+                                                ...prev,
+                                                userId: event.target.value ? Number(event.target.value) : undefined,
+                                            }))
+                                        }
+                                        placeholder="Enter user ID"
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500">
+                                    Reserve capacity without assigning it to a specific member. You can link the reservation later.
+                                </p>
+                            )}
                             <select
                                 value={reservationForm.lockerId}
                                 onChange={(event) => setReservationForm((prev) => ({ ...prev, lockerId: event.target.value }))}
@@ -1309,6 +1897,150 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     </div>
                 </div>
             </div>
+        </div>
+    );
+
+    const renderLocationsManagement = () => (
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Locations & lockers</h2>
+                    <p className="text-gray-500">Review every site with its lockers, availability, and open issues.</p>
+                </div>
+                <button
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm"
+                    onClick={() => {
+                        setLocationHierarchyLoading(true);
+                        lockerManagementService
+                            .getLocationsHierarchy(token)
+                            .then((response) => {
+                                setLocationHierarchy(response.data);
+                                setLocationHierarchyError(null);
+                                if (response.errors?.includes('FALLBACK_DATA')) {
+                                    pushToast({
+                                        type: 'warning',
+                                        title: 'Limited data',
+                                        description:
+                                            response.message ||
+                                            'Showing cached location structure while live data is unavailable.',
+                                    });
+                                }
+                            })
+                            .catch((error) => {
+                                const description =
+                                    error instanceof Error ? error.message : 'Unexpected error refreshing locations.';
+                                setLocationHierarchyError(description);
+                                pushToast({ type: 'error', title: 'Unable to refresh locations', description });
+                            })
+                            .finally(() => setLocationHierarchyLoading(false));
+                    }}
+                >
+                    <RefreshCw className="w-4 h-4" /> Refresh
+                </button>
+            </div>
+
+            {locationHierarchyLoading ? (
+                <div className="flex justify-center items-center h-56">
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+            ) : locationHierarchyError ? (
+                <div className="border border-red-100 bg-red-50 text-red-600 rounded-lg px-4 py-3 text-sm">
+                    {locationHierarchyError}
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {locationHierarchy.map((entry) => (
+                        <div key={entry.location.id} className="bg-white rounded-xl shadow-sm border border-gray-100">
+                            <div className="p-6 border-b border-gray-100 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <MapPin className="w-5 h-5 text-blue-600" />
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">{entry.location.name}</h3>
+                                            <p className="text-sm text-gray-500">{entry.location.address}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+                                        <span>
+                                            Total lockers: <strong>{entry.totalLockers}</strong>
+                                        </span>
+                                        <span>
+                                            Available: <strong className="text-emerald-600">{entry.availableLockers}</strong>
+                                        </span>
+                                        <span>
+                                            Issues: <strong className="text-amber-600">{entry.issueCount ?? 0}</strong>
+                                        </span>
+                                        <span>
+                                            Maintenance: <strong className="text-indigo-600">{entry.maintenanceCount ?? 0}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                {entry.location.features?.length ? (
+                                    <div className="text-xs text-gray-500 max-w-sm">
+                                        <p className="font-semibold text-gray-700">Features</p>
+                                        <p>{entry.location.features.join(' · ')}</p>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="p-6 overflow-x-auto">
+                                {entry.lockers.length ? (
+                                    <table className="min-w-full divide-y divide-gray-100 text-sm">
+                                        <thead>
+                                            <tr className="text-left text-gray-500">
+                                                <th className="py-2 pr-4 font-medium">Locker</th>
+                                                <th className="py-2 pr-4 font-medium">Size</th>
+                                                <th className="py-2 pr-4 font-medium">Status</th>
+                                                <th className="py-2 pr-4 font-medium">Subscription</th>
+                                                <th className="py-2 pr-4 font-medium">Next available</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 text-gray-700">
+                                            {entry.lockers.map((locker) => (
+                                                <tr key={locker.id} className="hover:bg-gray-50">
+                                                    <td className="py-3 pr-4">
+                                                        <div className="font-semibold text-gray-900">{locker.code || `Locker ${locker.lockerNumber}`}</div>
+                                                        <div className="text-xs text-gray-400">#{locker.lockerNumber}</div>
+                                                    </td>
+                                                    <td className="py-3 pr-4">{locker.size}</td>
+                                                    <td className="py-3 pr-4">
+                                                        <span
+                                                            className={cn(
+                                                                'px-2 py-1 rounded-full text-xs font-semibold',
+                                                                locker.status === 'AVAILABLE'
+                                                                    ? 'bg-emerald-50 text-emerald-600'
+                                                                    : locker.status === 'MAINTENANCE' || locker.status === 'OUT_OF_SERVICE'
+                                                                    ? 'bg-amber-50 text-amber-600'
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                            )}
+                                                        >
+                                                            {locker.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-xs text-gray-500">{locker.subscriptionId || '—'}</td>
+                                                    <td className="py-3 pr-4 text-xs text-gray-500">
+                                                        {locker.nextAvailableFrom
+                                                            ? new Date(locker.nextAvailableFrom).toLocaleString()
+                                                            : locker.status === 'AVAILABLE'
+                                                            ? 'Now'
+                                                            : 'TBD'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="text-sm text-gray-500">No lockers registered for this location.</div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {!locationHierarchy.length && (
+                        <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                            No locations found. Add a location to start managing lockers.
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 
@@ -1410,6 +2142,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             {activeTab === 'overview' && renderOverview()}
             {activeTab === 'plans' && renderPlans()}
             {activeTab === 'subscriptions' && renderSubscriptions()}
+            {activeTab === 'locations' && renderLocationsManagement()}
             {activeTab === 'lockers' && renderLockers()}
             {activeTab === 'reservations' && renderReservations()}
         </div>
