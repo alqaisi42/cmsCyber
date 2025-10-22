@@ -297,7 +297,7 @@ class LockerManagementService {
                                 city: 'Unknown',
                                 totalLockers: locationNode.lockerCount,
                                 availableLockers: locationNode.availableLockerCount,
-                                status: 'ACTIVE',
+                                status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
                             };
 
                         return {
