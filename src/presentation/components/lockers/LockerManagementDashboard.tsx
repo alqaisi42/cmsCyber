@@ -6,8 +6,7 @@ import {
     CreateSubscriptionRequest,
     LockerSubscription,
     LockerSubscriptionPlan,
-    ShareSubscriptionRequest,
-    SubscriptionUsageSnapshot,
+    ShareSubscriptionRequest, SubscriptionUsageSnapshot,
     UpdateSharingRequest,
 } from '../../../core/entities/locker-subscription';
 import {

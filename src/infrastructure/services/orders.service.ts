@@ -136,8 +136,6 @@ class OrdersService {
     }
 
 
-
-
     checkLockerAvailability(params: LockerAvailabilityParams): Promise<ApiResponse<OrderLockerAvailabilityResult>> {
         const body: Record<string, unknown> = {
             userId: params.userId,
@@ -154,12 +152,14 @@ class OrdersService {
         });
     }
 
+
     getCheckoutSummary(params: CheckoutSummaryParams): Promise<ApiResponse<CheckoutSummary>> {
         const query = this.buildQuery(params);
         return this.request(`${this.checkoutUrl}/summary?${query}`, {
             method: 'GET',
         });
     }
+
 
     createOrder(payload: CreateOrderRequest): Promise<ApiResponse<OrderDetail>> {
         return this.request(`${this.checkoutUrl}/create-order`, {
