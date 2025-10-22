@@ -51,6 +51,12 @@ interface LockerIssueDto extends LockerIssue {}
 
 interface MaintenanceRecordDto extends LockerMaintenanceRecord {}
 
+type PaginationMetadata = Omit<PagedResult<LockerIssue>, 'content'>;
+
+export interface LockerIssuesResponse extends ApiResponse<LockerIssue[]> {
+    pagination?: PaginationMetadata;
+}
+
 export interface OutOfServiceLockersResponse {
     lockers: LockerSummary[];
     totalElements: number;
@@ -177,7 +183,7 @@ class LockerSupportService {
         lockerId: string,
         filters: LockerIssueFilters = {},
         token?: string
-    ): Promise<ApiResponse<LockerIssue[]>> {
+    ): Promise<LockerIssuesResponse> {
         const searchParams = new URLSearchParams();
         if (filters.status) {
             searchParams.set('status', filters.status);
@@ -190,14 +196,27 @@ class LockerSupportService {
         }
 
         const url = `${this.baseUrl}/${lockerId}/issues${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-        const response = await this.request<LockerIssueDto[]>(url, {
+        const response = await this.request<LockerIssueDto[] | PagedResult<LockerIssueDto>>(url, {
             method: 'GET',
             headers: this.getHeaders(token),
         });
 
+        const rawData = response.data;
+        let issues: LockerIssueDto[] = [];
+        let pagination: PaginationMetadata | undefined;
+
+        if (Array.isArray(rawData)) {
+            issues = rawData;
+        } else if (rawData && typeof rawData === 'object') {
+            issues = rawData.content ?? [];
+            const { content, ...meta } = rawData;
+            pagination = meta;
+        }
+
         return {
             ...response,
-            data: response.data.map((issue) => this.mapIssue(issue)),
+            data: issues.map((issue) => this.mapIssue(issue)),
+            ...(pagination ? { pagination } : {}),
         };
     }
 
