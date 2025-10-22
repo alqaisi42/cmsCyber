@@ -51,6 +51,7 @@ interface AdminStatisticsResponse extends ApiResponse<AdminOrderStatistics> {}
 class OrdersService {
     private readonly baseUrl = '/api/v1/orders';
     private readonly checkoutUrl = '/api/v1/checkout';
+    private readonly lockerUrl = '/api/v1/lockers';
     private readonly adminUrl = '/api/v1/admin/orders';
 
     private buildQuery(params: Record<string, any>): string {
@@ -117,17 +118,33 @@ class OrdersService {
     // Checkout Phase
     // ------------------------------------------------------
     validateCheckout(userId: number, payload?: CheckoutValidationPayload): Promise<ApiResponse<CheckoutValidationResult>> {
-        const query = this.buildQuery({ userId });
-        return this.request(`${this.checkoutUrl}/validate?${query}`, {
+        const body: Record<string, unknown> = {
+            userId,
+        };
+
+        if (payload?.items && payload.items.length > 0) {
+            body.items = payload.items;
+        }
+
+        return this.request(`${this.checkoutUrl}/validate`, {
             method: 'POST',
-            body: payload as any,
+            body: body as any,
         });
     }
 
     checkLockerAvailability(params: LockerAvailabilityParams): Promise<ApiResponse<OrderLockerAvailabilityResult>> {
-        const query = this.buildQuery(params);
-        return this.request(`${this.checkoutUrl}/locker-availability?${query}`, {
-            method: 'GET',
+        const body: Record<string, unknown> = {
+            userId: params.userId,
+            locationId: params.locationId,
+        };
+
+        if (params.requiredSize) {
+            body.requiredSize = params.requiredSize;
+        }
+
+        return this.request(`${this.lockerUrl}/check-availability`, {
+            method: 'POST',
+            body: body as any,
         });
     }
 

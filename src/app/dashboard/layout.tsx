@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '../../presentation/components/Sidebar';
+import { ToastProvider } from '@/presentation/components/ui/toast';
 
 export default function DashboardLayout({
                                             children,
@@ -64,18 +65,20 @@ export default function DashboardLayout({
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-50">
-            <Sidebar />
-            <main className="flex-1 lg:ml-64 p-8">
-                {process.env.NODE_ENV === 'development' && (
-                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                            ⚠️ <strong>Development Mode</strong> - Auth check bypassed
-                        </p>
-                    </div>
-                )}
-                <div className="max-w-7xl mx-auto">{children}</div>
-            </main>
-        </div>
+        <ToastProvider>
+            <div className="flex min-h-screen bg-gray-50">
+                <Sidebar />
+                <main className="flex-1 p-8 lg:ml-64">
+                    {process.env.NODE_ENV === 'development' && (
+                        <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                            <p className="text-sm text-yellow-800">
+                                ⚠️ <strong>Development Mode</strong> - Auth check bypassed
+                            </p>
+                        </div>
+                    )}
+                    <div className="mx-auto max-w-7xl">{children}</div>
+                </main>
+            </div>
+        </ToastProvider>
     );
 }

@@ -1,7 +1,7 @@
 // src/app/dashboard/admin/orders/page.tsx
 'use client';
 
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
     AlertTriangle,
     Calendar,
@@ -61,6 +61,9 @@ import {
     UpdateOrderStatusRequest,
 } from '@/core/entities/orders';
 import {formatCurrency, formatDate} from '@/shared/utils/cn';
+import { useToast } from '@/presentation/components/ui/toast';
+import { lockerManagementService } from '@/infrastructure/services/locker-management.service';
+import type { LockerLocation } from '@/core/entities/lockers';
 
 const ORDER_STATUSES: OrderStatus[] = [
     'REQUESTED',
@@ -100,6 +103,7 @@ function useActionFeedback(): [ActionResultState, (message: string) => void, (er
 }
 
 export default function AdminOrdersPage() {
+    const { pushToast } = useToast();
     const [statusFilter, setStatusFilter] = useState('');
     const [userIdFilter, setUserIdFilter] = useState('');
     const [vendorIdFilter, setVendorIdFilter] = useState('');
@@ -118,10 +122,10 @@ export default function AdminOrdersPage() {
     const [lockerParams, setLockerParams] = useState({
         userId: '',
         locationId: '',
-        lockerId: '',
-        deliveryTime: '',
         requiredSize: 'MEDIUM',
     });
+    const [lockerLocations, setLockerLocations] = useState<LockerLocation[]>([]);
+    const [locationsLoading, setLocationsLoading] = useState(false);
     const [createOrderPayload, setCreateOrderPayload] = useState<CreateOrderRequest>({
         userId: 0,
         vendorId: '',
@@ -135,6 +139,54 @@ export default function AdminOrdersPage() {
     });
 
     const [actionState, setActionMessage, setActionError, clearActionState] = useActionFeedback();
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadLocations = async () => {
+            setLocationsLoading(true);
+            try {
+                const response = await lockerManagementService.getLocations();
+                if (!isMounted) {
+                    return;
+                }
+                setLockerLocations(response.data || []);
+
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Using fallback locker locations',
+                        description: response.message || 'Showing cached locker locations until live data becomes available.',
+                    });
+                }
+            } catch (error) {
+                if (!isMounted) {
+                    return;
+                }
+                const message = error instanceof Error ? error.message : 'Unable to load locker locations.';
+                pushToast({
+                    type: 'error',
+                    title: 'Failed to load locker locations',
+                    description: message,
+                });
+            } finally {
+                if (isMounted) {
+                    setLocationsLoading(false);
+                }
+            }
+        };
+
+        loadLocations();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [pushToast]);
+
+    const selectedLockerLocation = useMemo(
+        () => lockerLocations.find((location) => location.id === lockerParams.locationId),
+        [lockerLocations, lockerParams.locationId]
+    );
 
     const searchFilters = useMemo(() => {
         const parsedUserId = userIdFilter ? Number(userIdFilter) : undefined;
@@ -186,6 +238,9 @@ export default function AdminOrdersPage() {
     const checkoutSummaryMutation = useCheckoutSummary();
     const createOrderMutation = useCreateOrder();
 
+    const lockerAvailabilityData = lockerAvailabilityMutation.data?.data;
+    const lockerAvailabilityMessage = lockerAvailabilityMutation.data?.message;
+
     const resetPagination = () => setPage(0);
 
     const handleFilterSubmit = (event: React.FormEvent) => {
@@ -208,11 +263,23 @@ export default function AdminOrdersPage() {
     const handleAction = async (action: () => Promise<any>, successMessage: string) => {
         try {
             clearActionState();
-            await action();
+            const result = await action();
             setActionMessage(successMessage);
+            if (successMessage) {
+                pushToast({
+                    type: 'success',
+                    title: successMessage,
+                });
+            }
+            return result;
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Action failed';
             setActionError(message);
+            pushToast({
+                type: 'error',
+                title: 'Action failed',
+                description: message,
+            });
         }
     };
 
@@ -240,28 +307,50 @@ export default function AdminOrdersPage() {
 
     const handleValidateCheckout = async (event: React.FormEvent) => {
         event.preventDefault();
-        const userId = Number(checkoutUserId);
-        if (Number.isNaN(userId)) {
-            setActionError('Please provide a valid user ID for checkout validation.');
+        const trimmed = checkoutUserId.trim();
+        const userId = Number(trimmed);
+        if (!trimmed || Number.isNaN(userId) || userId <= 0) {
+            const errorMessage = 'Please provide a valid user ID for checkout validation.';
+            setActionError(errorMessage);
+            pushToast({
+                type: 'error',
+                title: 'Invalid checkout data',
+                description: errorMessage,
+            });
             return;
         }
         await handleAction(
             async () => validateCheckoutMutation.mutateAsync({userId}),
-            'Checkout validated successfully'
+            'Checkout validation completed'
         );
     };
 
     const handleLockerAvailability = async (event: React.FormEvent) => {
         event.preventDefault();
+        const numericUserId = Number(lockerParams.userId.trim());
         const payload = {
-            userId: Number(lockerParams.userId),
+            userId: numericUserId,
             locationId: lockerParams.locationId,
-            lockerId: lockerParams.lockerId,
-            deliveryTime: lockerParams.deliveryTime,
-            requiredSize: lockerParams.requiredSize,
+            requiredSize: lockerParams.requiredSize || undefined,
         };
-        if (!payload.userId || !payload.locationId || !payload.lockerId || !payload.deliveryTime) {
-            setActionError('Complete locker availability parameters before submitting.');
+        if (!payload.userId || Number.isNaN(payload.userId)) {
+            const errorMessage = 'Enter a valid user ID to check locker availability.';
+            setActionError(errorMessage);
+            pushToast({
+                type: 'error',
+                title: 'Invalid locker request',
+                description: errorMessage,
+            });
+            return;
+        }
+        if (!payload.locationId) {
+            const errorMessage = 'Select a locker location before checking availability.';
+            setActionError(errorMessage);
+            pushToast({
+                type: 'error',
+                title: 'Location required',
+                description: errorMessage,
+            });
             return;
         }
         await handleAction(
@@ -272,9 +361,16 @@ export default function AdminOrdersPage() {
 
     const handleCheckoutSummary = async (event: React.FormEvent) => {
         event.preventDefault();
-        const userId = Number(checkoutUserId);
-        if (Number.isNaN(userId)) {
-            setActionError('Please provide a valid user ID to get checkout summary.');
+        const trimmed = checkoutUserId.trim();
+        const userId = Number(trimmed);
+        if (!trimmed || Number.isNaN(userId) || userId <= 0) {
+            const errorMessage = 'Please provide a valid user ID to get checkout summary.';
+            setActionError(errorMessage);
+            pushToast({
+                type: 'error',
+                title: 'Invalid checkout data',
+                description: errorMessage,
+            });
             return;
         }
         await handleAction(
@@ -771,8 +867,8 @@ export default function AdminOrdersPage() {
 
                         <form onSubmit={handleLockerAvailability}
                               className="border border-slate-200 rounded-2xl p-4 space-y-4">
-                            <h3 className="text-sm font-semibold text-slate-900 uppercase">Check locker
-                                availability</h3>
+                            <h3 className="text-sm font-semibold text-slate-900 uppercase">Check locker availability</h3>
+                            <p className="text-xs text-slate-500">Quickly verify if a locker is available for the selected user and location.</p>
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="text-xs text-slate-500 uppercase">User ID</label>
@@ -782,42 +878,35 @@ export default function AdminOrdersPage() {
                                             ...prev,
                                             userId: event.target.value
                                         }))}
-                                        className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="e.g. 1024"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500 uppercase">Location ID</label>
-                                    <input
+                                    <label className="text-xs text-slate-500 uppercase">Location</label>
+                                    <select
                                         value={lockerParams.locationId}
                                         onChange={(event) => setLockerParams((prev) => ({
                                             ...prev,
                                             locationId: event.target.value
                                         }))}
-                                        className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-500 uppercase">Locker ID</label>
-                                    <input
-                                        value={lockerParams.lockerId}
-                                        onChange={(event) => setLockerParams((prev) => ({
-                                            ...prev,
-                                            lockerId: event.target.value
-                                        }))}
-                                        className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-500 uppercase">Delivery time</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={lockerParams.deliveryTime}
-                                        onChange={(event) => setLockerParams((prev) => ({
-                                            ...prev,
-                                            deliveryTime: event.target.value
-                                        }))}
-                                        className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                                        disabled={locationsLoading}
+                                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                    >
+                                        <option value="">
+                                            {locationsLoading ? 'Loading locations…' : 'Select a location'}
+                                        </option>
+                                        {lockerLocations.map((location) => (
+                                            <option key={location.id} value={location.id}>
+                                                {location.name} — {location.city}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {selectedLockerLocation && (
+                                        <p className="mt-1 text-[11px] text-slate-500">
+                                            {selectedLockerLocation.address}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-xs text-slate-500 uppercase">Required size</label>
@@ -827,28 +916,108 @@ export default function AdminOrdersPage() {
                                             ...prev,
                                             requiredSize: event.target.value
                                         }))}
-                                        className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
+                                        <option value="">Any size</option>
                                         <option value="SMALL">Small</option>
                                         <option value="MEDIUM">Medium</option>
                                         <option value="LARGE">Large</option>
+                                        <option value="EXTRA_LARGE">Extra large</option>
                                     </select>
                                 </div>
                             </div>
                             <button
                                 type="submit"
-                                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
                                 disabled={lockerAvailabilityMutation.isPending}
                             >
                                 {lockerAvailabilityMutation.isPending && <Loader2 className="w-4 h-4 animate-spin"/>}
                                 Check availability
                             </button>
-                            {lockerAvailabilityMutation.data && (
-                                <div
-                                    className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                                    <p>Available: {lockerAvailabilityMutation.data.data.isAvailable ? 'Yes' : 'No'}</p>
-                                    {lockerAvailabilityMutation.data.data.reason && (
-                                        <p className="mt-1">Reason: {lockerAvailabilityMutation.data.data.reason}</p>
+                            {lockerAvailabilityData && (
+                                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+                                    <div className={`flex items-center gap-2 text-sm font-semibold ${lockerAvailabilityData.isAvailable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {lockerAvailabilityData.isAvailable ? (
+                                            <CheckCircle2 className="h-4 w-4"/>
+                                        ) : (
+                                            <AlertTriangle className="h-4 w-4"/>
+                                        )}
+                                        {lockerAvailabilityData.isAvailable ? 'Lockers available' : 'No lockers available'}
+                                    </div>
+                                    <p className="text-[11px] uppercase text-slate-500">Total available: {lockerAvailabilityData.totalAvailable}</p>
+                                    {lockerAvailabilityMessage && (
+                                        <p className="text-[11px] text-slate-500">{lockerAvailabilityMessage}</p>
+                                    )}
+                                    {lockerAvailabilityData.availableLockers && lockerAvailabilityData.availableLockers.length > 0 && (
+                                        <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] font-semibold uppercase text-slate-500">Recommended lockers</p>
+                                            <div className="space-y-2">
+                                                {lockerAvailabilityData.availableLockers.map((locker) => (
+                                                    <div
+                                                        key={locker.lockerId}
+                                                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                                                    >
+                                                        <p className="text-sm font-semibold text-slate-900">
+                                                            {locker.lockerName || locker.lockerCode}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">{locker.locationName}</p>
+                                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] uppercase text-slate-500">
+                                                            <span>Size: {locker.size}</span>
+                                                            <span>Status: {locker.status}</span>
+                                                            {typeof locker.distanceKm === 'number' && (
+                                                                <span>{locker.distanceKm.toFixed(1)} km away</span>
+                                                            )}
+                                                            {locker.subscriptionId && <span>Subscription: {locker.subscriptionId}</span>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {lockerAvailabilityData.subscriptionInfo && (
+                                        <div className="rounded-lg border border-emerald-200 bg-white p-3">
+                                            <p className="text-[11px] font-semibold uppercase text-emerald-600">Subscription details</p>
+                                            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                                                <div>
+                                                    <p className="font-semibold text-slate-900">Subscription</p>
+                                                    <p>{lockerAvailabilityData.subscriptionInfo.subscriptionId}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900">Role</p>
+                                                    <p>{lockerAvailabilityData.subscriptionInfo.isOwner ? 'Owner' : 'Shared member'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900">Capacity</p>
+                                                    <p>{lockerAvailabilityData.subscriptionInfo.remainingCapacity} / {lockerAvailabilityData.subscriptionInfo.totalCapacity}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900">Active reservations</p>
+                                                    <p>{lockerAvailabilityData.subscriptionInfo.activeReservations}</p>
+                                                </div>
+                                                {lockerAvailabilityData.subscriptionInfo.sharingType && (
+                                                    <div className="col-span-2">
+                                                        <p className="font-semibold text-slate-900">Sharing type</p>
+                                                        <p>{lockerAvailabilityData.subscriptionInfo.sharingType}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {lockerAvailabilityData.unavailabilityReason && (
+                                        <div className="rounded-lg border border-rose-200 bg-white p-3 text-rose-600">
+                                            <p className="text-[11px] font-semibold uppercase">Reason</p>
+                                            <p className="mt-1 text-xs">{lockerAvailabilityData.unavailabilityReason}</p>
+                                        </div>
+                                    )}
+                                    {lockerAvailabilityData.suggestedActions && lockerAvailabilityData.suggestedActions.length > 0 && (
+                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] font-semibold uppercase text-slate-600">Suggested actions</p>
+                                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-600">
+                                                {lockerAvailabilityData.suggestedActions?.map((suggestion, index) => (
+                                                    <li key={index}>{suggestion}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     )}
                                 </div>
                             )}
