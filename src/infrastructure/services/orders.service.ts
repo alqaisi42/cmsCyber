@@ -117,20 +117,26 @@ class OrdersService {
     // ------------------------------------------------------
     // Checkout Phase
     // ------------------------------------------------------
-    validateCheckout(userId: number, payload?: CheckoutValidationPayload): Promise<ApiResponse<CheckoutValidationResult>> {
-        const body: Record<string, unknown> = {
-            userId,
-        };
+    validateCheckout(
+        userId: number,
+        payload?: CheckoutValidationPayload
+    ): Promise<ApiResponse<CheckoutValidationResult>> {
+        const query = this.buildQuery({ userId })
+        const body: Record<string, unknown> = {}
 
-        if (payload?.items && payload.items.length > 0) {
-            body.items = payload.items;
+        if (payload?.items?.length) {
+            body.items = payload.items
         }
 
-        return this.request(`${this.checkoutUrl}/validate`, {
+        return this.request(`${this.checkoutUrl}/validate?${query}`, {
             method: 'POST',
-            body: body as any,
-        });
+            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json' },
+        })
     }
+
+
+
 
     checkLockerAvailability(params: LockerAvailabilityParams): Promise<ApiResponse<OrderLockerAvailabilityResult>> {
         const body: Record<string, unknown> = {
