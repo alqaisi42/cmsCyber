@@ -64,6 +64,7 @@ import {formatCurrency, formatDate} from '@/shared/utils/cn';
 import { useToast } from '@/presentation/components/ui/toast';
 import { lockerManagementService } from '@/infrastructure/services/locker-management.service';
 import type { LockerLocation } from '@/core/entities/lockers';
+import { useAuthStore } from '../../../../presentation/contexts/auth-store';
 
 const ORDER_STATUSES: OrderStatus[] = [
     'REQUESTED',
@@ -139,6 +140,7 @@ export default function AdminOrdersPage() {
     });
 
     const [actionState, setActionMessage, setActionError, clearActionState] = useActionFeedback();
+    const { token } = useAuthStore();
 
     useEffect(() => {
         let isMounted = true;
@@ -146,7 +148,7 @@ export default function AdminOrdersPage() {
         const loadLocations = async () => {
             setLocationsLoading(true);
             try {
-                const response = await lockerManagementService.getLocations();
+                const response = await lockerManagementService.getLocations(token);
                 if (!isMounted) {
                     return;
                 }

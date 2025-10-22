@@ -7,6 +7,7 @@ import {
     LockerAvailabilityRequest,
     LockerAvailabilityResult,
     LockerLocation,
+    LockerLocationWithLockers,
     LockerReservation,
     LockerReservationActionResponse,
     LockerReservationRequest,
@@ -20,6 +21,18 @@ interface LockerApiResponse<T> {
     errors: string[];
     timestamp: string;
 }
+
+interface LockerPagedData<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+    first?: boolean;
+    last?: boolean;
+}
+
+type LockerPagedResponse<T> = LockerApiResponse<LockerPagedData<T>>;
 
 const FALLBACK_LOCATIONS: LockerLocation[] = [
     {
@@ -103,8 +116,20 @@ const FALLBACK_LOCKERS: LockerSummary[] = [
     },
 ];
 
+const FALLBACK_LOCATION_TREE: LockerLocationWithLockers[] = FALLBACK_LOCATIONS.map((location) => {
+    const lockers = FALLBACK_LOCKERS.filter((locker) => locker.locationId === location.id);
+    return {
+        location,
+        lockers: lockers.length ? lockers : FALLBACK_LOCKERS,
+        totalLockers: location.totalLockers,
+        availableLockers: location.availableLockers,
+        maintenanceCount: 0,
+        issueCount: 0,
+    };
+});
+
 class LockerManagementService {
-    private readonly baseUrl = '/api/v1/lockers';
+    private readonly baseUrl = '/api/v1/admin/lockers';
     private readonly calendarUrl = '/api/v1/family-calendar';
 
     private resolveToken(explicitToken?: string): string | null {
@@ -133,11 +158,11 @@ class LockerManagementService {
         return headers;
     }
 
-    async getLocations(): Promise<LockerApiResponse<LockerLocation[]>> {
+    async getLocations(token?: string): Promise<LockerApiResponse<LockerLocation[]>> {
         try {
             const response = await fetch(`${this.baseUrl}/locations`, {
                 cache: 'no-store',
-                headers: this.getHeaders(),
+                headers: this.getHeaders(token),
             });
 
             if (!response.ok) {
@@ -157,11 +182,11 @@ class LockerManagementService {
         }
     }
 
-    async getLockersByLocation(locationId: string): Promise<LockerApiResponse<LockerSummary[]>> {
+    async getLocationsHierarchy(token?: string): Promise<LockerApiResponse<LockerLocationWithLockers[]>> {
         try {
-            const response = await fetch(`${this.baseUrl}/locations/${locationId}/lockers`, {
+            const response = await fetch(`${this.baseUrl}/locations/tree`, {
                 cache: 'no-store',
-                headers: this.getHeaders(),
+                headers: this.getHeaders(token),
             });
 
             if (!response.ok) {
@@ -169,6 +194,43 @@ class LockerManagementService {
             }
 
             return await response.json();
+        } catch (error) {
+            console.warn('Failed to fetch location locker hierarchy. Using fallback data.', error);
+            return {
+                success: true,
+                data: FALLBACK_LOCATION_TREE,
+                message: 'Showing fallback location hierarchy',
+                errors: ['FALLBACK_DATA'],
+                timestamp: new Date().toISOString(),
+            };
+        }
+    }
+
+    async getLockersByLocation(locationId: string, token?: string): Promise<LockerApiResponse<LockerSummary[]>> {
+        try {
+            const params = new URLSearchParams({
+                locationId,
+                page: '0',
+                size: '50',
+                sort: 'lockerNumber,asc',
+            });
+            const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
+                cache: 'no-store',
+                headers: this.getHeaders(token),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const payload: LockerPagedResponse<LockerSummary> = await response.json();
+            return {
+                success: payload.success,
+                data: payload.data?.content ?? [],
+                message: payload.message,
+                errors: payload.errors,
+                timestamp: payload.timestamp,
+            };
         } catch (error) {
             console.warn('Failed to fetch lockers for location. Using fallback data.', error);
             const filtered = FALLBACK_LOCKERS.filter((locker) => locker.locationId === locationId);
@@ -180,6 +242,19 @@ class LockerManagementService {
                 timestamp: new Date().toISOString(),
             };
         }
+    }
+
+    async getActiveSubscriptionsForUser(userId: number, token?: string) {
+        const response = await fetch(`${this.baseUrl}/users/${userId}/active-subscriptions`, {
+            cache: 'no-store',
+            headers: this.getHeaders(token),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load active subscriptions: ${response.status}`);
+        }
+
+        return response.json();
     }
 
     async getAccessibleLocations(userId: number, token?: string) {

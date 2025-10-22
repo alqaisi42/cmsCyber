@@ -15,6 +15,7 @@ import {
     LockerAvailabilityRequest,
     LockerAvailabilityResult,
     LockerLocation,
+    LockerLocationWithLockers,
     LockerReservation,
     LockerReservationRequest,
     LockerSummary,
@@ -46,6 +47,7 @@ const tabs = [
     { id: 'overview', label: 'Overview', icon: Layers },
     { id: 'plans', label: 'Subscription Plans', icon: CreditCard },
     { id: 'subscriptions', label: 'Subscriptions', icon: Users },
+    { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
     { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
 ] as const;
@@ -78,22 +80,24 @@ const INITIAL_SHARING_FORM: ShareSubscriptionRequest = {
 };
 
 const INITIAL_AVAILABILITY_FORM: LockerAvailabilityRequest = {
-    userId: 0,
+    userId: undefined,
     locationId: '',
     requiredSize: 'MEDIUM',
     requestedFrom: '',
     requestedUntil: '',
     reservationType: 'DELIVERY',
+    userScope: 'SPECIFIC_USER',
 };
 
 const INITIAL_RESERVATION_FORM: LockerReservationRequest = {
-    userId: 0,
+    userId: undefined,
     lockerId: '',
     locationId: '',
     reservedFrom: '',
     reservedUntil: '',
     reservationType: 'DELIVERY',
     notes: '',
+    userScope: 'SPECIFIC_USER',
 };
 
 export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerManagementDashboardProps) {
@@ -104,6 +108,9 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [plans, setPlans] = useState<LockerSubscriptionPlan[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
     const [plansMessage, setPlansMessage] = useState<string | null>(null);
+    const [activePlans, setActivePlans] = useState<LockerSubscription[]>([]);
+    const [activePlansLoading, setActivePlansLoading] = useState(false);
+    const [activePlansError, setActivePlansError] = useState<string | null>(null);
 
     const [subscriptions, setSubscriptions] = useState<LockerSubscription[]>([]);
     const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
@@ -111,6 +118,9 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
     const [locations, setLocations] = useState<LockerLocation[]>([]);
     const [locationsLoading, setLocationsLoading] = useState(false);
+    const [locationHierarchy, setLocationHierarchy] = useState<LockerLocationWithLockers[]>([]);
+    const [locationHierarchyLoading, setLocationHierarchyLoading] = useState(false);
+    const [locationHierarchyError, setLocationHierarchyError] = useState<string | null>(null);
     const [selectedLocationId, setSelectedLocationId] = useState<string>('');
     const [locationLockers, setLocationLockers] = useState<LockerSummary[]>([]);
     const [accessibleLockers, setAccessibleLockers] = useState<LockerSummary[]>([]);
@@ -122,9 +132,15 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [availabilityForm, setAvailabilityForm] = useState<LockerAvailabilityRequest>(INITIAL_AVAILABILITY_FORM);
     const [availabilityResult, setAvailabilityResult] = useState<LockerAvailabilityResult | null>(null);
     const [availabilityState, setAvailabilityState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [availabilityScope, setAvailabilityScope] = useState<'SPECIFIC_USER' | 'ALL_USERS'>(
+        INITIAL_AVAILABILITY_FORM.userScope || 'SPECIFIC_USER'
+    );
 
     const [reservationForm, setReservationForm] = useState<LockerReservationRequest>(INITIAL_RESERVATION_FORM);
     const [reservationState, setReservationState] = useState<ActionState>({ loading: false, message: null, error: null });
+    const [reservationScope, setReservationScope] = useState<'SPECIFIC_USER' | 'ALL_USERS'>(
+        INITIAL_RESERVATION_FORM.userScope || 'SPECIFIC_USER'
+    );
 
     const [createSubscriptionForm, setCreateSubscriptionForm] = useState<CreateSubscriptionRequest>(INITIAL_SUBSCRIPTION_FORM);
     const [createFormOpen, setCreateFormOpen] = useState(false);
@@ -155,9 +171,26 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [defaultTab]);
 
     useEffect(() => {
-        setAvailabilityForm((prev) => ({ ...prev, userId: selectedUserId }));
-        setReservationForm((prev) => ({ ...prev, userId: selectedUserId }));
-    }, [selectedUserId]);
+        if (availabilityScope === 'SPECIFIC_USER') {
+            setAvailabilityForm((prev) => ({
+                ...prev,
+                userId: selectedUserId || undefined,
+                userScope: 'SPECIFIC_USER',
+            }));
+        }
+        if (reservationScope === 'SPECIFIC_USER') {
+            setReservationForm((prev) => ({
+                ...prev,
+                userId: selectedUserId || undefined,
+                userScope: 'SPECIFIC_USER',
+            }));
+        }
+    }, [selectedUserId, availabilityScope, reservationScope]);
+
+    useEffect(() => {
+        setAvailabilityForm((prev) => ({ ...prev, locationId: selectedLocationId }));
+        setReservationForm((prev) => ({ ...prev, locationId: selectedLocationId }));
+    }, [selectedLocationId]);
 
     useEffect(() => {
         const loadPlans = async () => {
@@ -189,26 +222,59 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         const loadLocations = async () => {
             setLocationsLoading(true);
             try {
-                const response = await lockerManagementService.getLocations();
+                const response = await lockerManagementService.getLocations(token);
                 setLocations(response.data);
-                setLocationsLoading(false);
+                if (response.data.length) {
+                    setSelectedLocationId((prev) => prev || response.data[0].id);
+                }
             } catch (error) {
                 console.error('Failed to load locations:', error);
-                setLocationsLoading(false);
                 pushToast({
                     type: 'error',
                     title: 'Failed to load locations',
                     description: error instanceof Error ? error.message : 'Unexpected error retrieving locker locations.',
                 });
+            } finally {
+                setLocationsLoading(false);
+            }
+        };
+
+        const loadLocationHierarchy = async () => {
+            setLocationHierarchyLoading(true);
+            setLocationHierarchyError(null);
+            try {
+                const response = await lockerManagementService.getLocationsHierarchy(token);
+                setLocationHierarchy(response.data);
+                if (response.errors?.includes('FALLBACK_DATA')) {
+                    pushToast({
+                        type: 'warning',
+                        title: 'Limited location data',
+                        description: response.message ||
+                            'Showing cached location structure while the admin API is unavailable.',
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load location hierarchy:', error);
+                const description = error instanceof Error ? error.message : 'Unexpected error retrieving location hierarchy.';
+                setLocationHierarchyError(description);
+                pushToast({
+                    type: 'error',
+                    title: 'Failed to load location hierarchy',
+                    description,
+                });
+            } finally {
+                setLocationHierarchyLoading(false);
             }
         };
 
         loadPlans();
         loadLocations();
-    }, [pushToast]);
+        loadLocationHierarchy();
+    }, [pushToast, token]);
 
     useEffect(() => {
         if (!token || !selectedUserId) {
+            setActivePlans([]);
             return;
         }
 
@@ -267,6 +333,54 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [token, selectedUserId, reservationStatusFilter, pushToast]);
 
     useEffect(() => {
+        if (!token || !selectedUserId) {
+            setActivePlans([]);
+            setActivePlansError(null);
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadActivePlans = async () => {
+            setActivePlansLoading(true);
+            setActivePlansError(null);
+            try {
+                const response = await lockerManagementService.getActiveSubscriptionsForUser(selectedUserId, token);
+                if (!cancelled) {
+                    setActivePlans(response.data);
+                    if (response.errors?.length) {
+                        pushToast({
+                            type: 'warning',
+                            title: 'Active plans response',
+                            description: response.message || 'Active plan data returned with warnings.',
+                        });
+                    }
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    const description = error instanceof Error ? error.message : 'Unexpected error loading active plans.';
+                    setActivePlansError(description);
+                    pushToast({
+                        type: 'error',
+                        title: 'Failed to load active plans',
+                        description,
+                    });
+                }
+            } finally {
+                if (!cancelled) {
+                    setActivePlansLoading(false);
+                }
+            }
+        };
+
+        loadActivePlans();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [token, selectedUserId, pushToast]);
+
+    useEffect(() => {
         if (!selectedLocationId) {
             setLocationLockers([]);
             setAvailableLockers([]);
@@ -275,7 +389,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
         const loadLocationLockers = async () => {
             try {
-                const response = await lockerManagementService.getLockersByLocation(selectedLocationId);
+                const response = await lockerManagementService.getLockersByLocation(selectedLocationId, token);
                 setLocationLockers(response.data);
             } catch (error) {
                 console.error('Failed to load lockers for location:', error);
@@ -288,9 +402,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         };
 
         const loadAvailable = async () => {
-            if (!selectedUserId) return;
+            const userContext =
+                availabilityScope === 'ALL_USERS' || reservationScope === 'ALL_USERS' ? 0 : selectedUserId;
+            if (userContext === undefined || userContext === null) {
+                setAvailableLockers([]);
+                return;
+            }
             try {
-                const response = await lockerManagementService.getAvailableLockersForUser(selectedUserId, selectedLocationId, token);
+                const response = await lockerManagementService.getAvailableLockersForUser(userContext, selectedLocationId, token);
                 setAvailableLockers(response.data);
             } catch (error) {
                 console.error('Failed to load available lockers for user:', error);
@@ -304,10 +423,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
 
         loadLocationLockers();
         loadAvailable();
-    }, [selectedLocationId, selectedUserId, token, pushToast]);
+    }, [selectedLocationId, selectedUserId, token, pushToast, availabilityScope, reservationScope]);
 
     const summaryMetrics = useMemo(() => {
-        const activeSubscriptions = subscriptions.filter((sub) => sub.subscriptionStatus === 'ACTIVE').length;
+        const activeSubscriptions = activePlans.length || subscriptions.filter((sub) => sub.subscriptionStatus === 'ACTIVE').length;
         const sharedSubscriptions = accessibleSubscriptions.filter((sub) => sub.ownerUserId !== selectedUserId).length;
         const activeReservations = reservations.filter((res) => res.status === 'ACTIVE' || res.status === 'CONFIRMED').length;
         const availableCapacity = locations.reduce((total, loc) => total + loc.availableLockers, 0);
@@ -536,7 +655,13 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     };
 
     const handleCheckAvailability = async () => {
-        if (!availabilityForm.userId || !availabilityForm.locationId || !availabilityForm.requestedFrom || !availabilityForm.requestedUntil) {
+        const requiresUser = availabilityScope === 'SPECIFIC_USER';
+        if (
+            !availabilityForm.locationId ||
+            !availabilityForm.requestedFrom ||
+            !availabilityForm.requestedUntil ||
+            (requiresUser && !availabilityForm.userId)
+        ) {
             const description = 'Complete all fields to check availability.';
             setAvailabilityState({ loading: false, message: null, error: description });
             pushToast({ type: 'warning', title: 'Missing information', description });
@@ -544,7 +669,12 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         }
         setAvailabilityState({ loading: true, message: null, error: null });
         try {
-            const availabilityResponse = await lockerManagementService.checkLockerAvailability(availabilityForm, token);
+            const payload: LockerAvailabilityRequest = {
+                ...availabilityForm,
+                userScope: availabilityScope,
+                userId: requiresUser ? availabilityForm.userId : undefined,
+            };
+            const availabilityResponse = await lockerManagementService.checkLockerAvailability(payload, token);
             setAvailabilityResult(availabilityResponse.data);
             setAvailabilityState({ loading: false, message: availabilityResponse.message, error: null });
             pushToast({
@@ -564,7 +694,14 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     };
 
     const handleReserveLocker = async () => {
-        if (!reservationForm.userId || !reservationForm.lockerId || !reservationForm.locationId || !reservationForm.reservedFrom || !reservationForm.reservedUntil) {
+        const requiresUser = reservationScope === 'SPECIFIC_USER';
+        if (
+            !reservationForm.lockerId ||
+            !reservationForm.locationId ||
+            !reservationForm.reservedFrom ||
+            !reservationForm.reservedUntil ||
+            (requiresUser && !reservationForm.userId)
+        ) {
             const description = 'Complete all required fields to reserve a locker.';
             setReservationState({ loading: false, message: null, error: description });
             pushToast({ type: 'warning', title: 'Missing information', description });
@@ -572,7 +709,12 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         }
         setReservationState({ loading: true, message: null, error: null });
         try {
-            const reservationResponse = await lockerManagementService.reserveLocker(reservationForm, token);
+            const payload: LockerReservationRequest = {
+                ...reservationForm,
+                userScope: reservationScope,
+                userId: requiresUser ? reservationForm.userId : undefined,
+            };
+            const reservationResponse = await lockerManagementService.reserveLocker(payload, token);
             setReservationState({ loading: false, message: reservationResponse.message || 'Locker reserved successfully.', error: null });
             if (selectedUserId) {
                 const reservationsResponse = await lockerManagementService.getReservationsForUser(selectedUserId, reservationStatusFilter, token);
@@ -741,7 +883,22 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {subscriptions.slice(0, 3).map((subscription) => {
+                        {activePlansLoading && (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                            </div>
+                        )}
+                        {activePlansError && (
+                            <div className="border border-red-100 bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3">
+                                {activePlansError}
+                            </div>
+                        )}
+                        {!activePlansLoading && !activePlansError && !activePlans.length && (
+                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                                No active subscriptions found for this user. Try selecting a different user ID.
+                            </div>
+                        )}
+                        {activePlans.slice(0, 3).map((subscription) => {
                             const usedLockers = subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
                             const billingLabel = subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly';
                             return (
@@ -772,11 +929,6 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                 </div>
                             );
                         })}
-                        {!subscriptions.length && (
-                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
-                                No subscriptions yet. Create one to start assigning lockers.
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -1475,6 +1627,67 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             <Clock className="w-5 h-5 text-blue-600" />
                         </div>
                         <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                                <button
+                                    onClick={() => {
+                                        setAvailabilityScope('SPECIFIC_USER');
+                                        setAvailabilityForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'SPECIFIC_USER',
+                                            userId: selectedUserId || prev.userId || undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        availabilityScope === 'SPECIFIC_USER'
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    Specific user
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setAvailabilityScope('ALL_USERS');
+                                        setAvailabilityForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'ALL_USERS',
+                                            userId: undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        availabilityScope === 'ALL_USERS'
+                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    All users
+                                </button>
+                            </div>
+                            {availabilityScope === 'SPECIFIC_USER' ? (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 mb-1 block">User ID</label>
+                                    <input
+                                        type="number"
+                                        value={availabilityForm.userId ?? ''}
+                                        onChange={(event) =>
+                                            setAvailabilityForm((prev) => ({
+                                                ...prev,
+                                                userId: event.target.value ? Number(event.target.value) : undefined,
+                                            }))
+                                        }
+                                        placeholder="Enter user ID"
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500">
+                                    Checking availability across all members with access to this location.
+                                </p>
+                            )}
                             <input
                                 type="datetime-local"
                                 value={availabilityForm.requestedFrom}
@@ -1526,6 +1739,67 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                         <h3 className="text-lg font-semibold text-gray-900 mb-3">Reserve locker</h3>
                         <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                                <button
+                                    onClick={() => {
+                                        setReservationScope('SPECIFIC_USER');
+                                        setReservationForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'SPECIFIC_USER',
+                                            userId: selectedUserId || prev.userId || undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        reservationScope === 'SPECIFIC_USER'
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    Specific user
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setReservationScope('ALL_USERS');
+                                        setReservationForm((prev) => ({
+                                            ...prev,
+                                            userScope: 'ALL_USERS',
+                                            userId: undefined,
+                                        }));
+                                    }}
+                                    className={cn(
+                                        'px-3 py-2 rounded-lg border',
+                                        reservationScope === 'ALL_USERS'
+                                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    )}
+                                    type="button"
+                                >
+                                    All users
+                                </button>
+                            </div>
+                            {reservationScope === 'SPECIFIC_USER' ? (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 mb-1 block">User ID</label>
+                                    <input
+                                        type="number"
+                                        value={reservationForm.userId ?? ''}
+                                        onChange={(event) =>
+                                            setReservationForm((prev) => ({
+                                                ...prev,
+                                                userId: event.target.value ? Number(event.target.value) : undefined,
+                                            }))
+                                        }
+                                        placeholder="Enter user ID"
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500">
+                                    Reserve capacity without assigning it to a specific member. You can link the reservation later.
+                                </p>
+                            )}
                             <select
                                 value={reservationForm.lockerId}
                                 onChange={(event) => setReservationForm((prev) => ({ ...prev, lockerId: event.target.value }))}
@@ -1591,6 +1865,150 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     </div>
                 </div>
             </div>
+        </div>
+    );
+
+    const renderLocationsManagement = () => (
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Locations & lockers</h2>
+                    <p className="text-gray-500">Review every site with its lockers, availability, and open issues.</p>
+                </div>
+                <button
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm"
+                    onClick={() => {
+                        setLocationHierarchyLoading(true);
+                        lockerManagementService
+                            .getLocationsHierarchy(token)
+                            .then((response) => {
+                                setLocationHierarchy(response.data);
+                                setLocationHierarchyError(null);
+                                if (response.errors?.includes('FALLBACK_DATA')) {
+                                    pushToast({
+                                        type: 'warning',
+                                        title: 'Limited data',
+                                        description:
+                                            response.message ||
+                                            'Showing cached location structure while live data is unavailable.',
+                                    });
+                                }
+                            })
+                            .catch((error) => {
+                                const description =
+                                    error instanceof Error ? error.message : 'Unexpected error refreshing locations.';
+                                setLocationHierarchyError(description);
+                                pushToast({ type: 'error', title: 'Unable to refresh locations', description });
+                            })
+                            .finally(() => setLocationHierarchyLoading(false));
+                    }}
+                >
+                    <RefreshCw className="w-4 h-4" /> Refresh
+                </button>
+            </div>
+
+            {locationHierarchyLoading ? (
+                <div className="flex justify-center items-center h-56">
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+            ) : locationHierarchyError ? (
+                <div className="border border-red-100 bg-red-50 text-red-600 rounded-lg px-4 py-3 text-sm">
+                    {locationHierarchyError}
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {locationHierarchy.map((entry) => (
+                        <div key={entry.location.id} className="bg-white rounded-xl shadow-sm border border-gray-100">
+                            <div className="p-6 border-b border-gray-100 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <MapPin className="w-5 h-5 text-blue-600" />
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">{entry.location.name}</h3>
+                                            <p className="text-sm text-gray-500">{entry.location.address}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+                                        <span>
+                                            Total lockers: <strong>{entry.totalLockers}</strong>
+                                        </span>
+                                        <span>
+                                            Available: <strong className="text-emerald-600">{entry.availableLockers}</strong>
+                                        </span>
+                                        <span>
+                                            Issues: <strong className="text-amber-600">{entry.issueCount ?? 0}</strong>
+                                        </span>
+                                        <span>
+                                            Maintenance: <strong className="text-indigo-600">{entry.maintenanceCount ?? 0}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                {entry.location.features?.length ? (
+                                    <div className="text-xs text-gray-500 max-w-sm">
+                                        <p className="font-semibold text-gray-700">Features</p>
+                                        <p>{entry.location.features.join(' · ')}</p>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="p-6 overflow-x-auto">
+                                {entry.lockers.length ? (
+                                    <table className="min-w-full divide-y divide-gray-100 text-sm">
+                                        <thead>
+                                            <tr className="text-left text-gray-500">
+                                                <th className="py-2 pr-4 font-medium">Locker</th>
+                                                <th className="py-2 pr-4 font-medium">Size</th>
+                                                <th className="py-2 pr-4 font-medium">Status</th>
+                                                <th className="py-2 pr-4 font-medium">Subscription</th>
+                                                <th className="py-2 pr-4 font-medium">Next available</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 text-gray-700">
+                                            {entry.lockers.map((locker) => (
+                                                <tr key={locker.id} className="hover:bg-gray-50">
+                                                    <td className="py-3 pr-4">
+                                                        <div className="font-semibold text-gray-900">{locker.code || `Locker ${locker.lockerNumber}`}</div>
+                                                        <div className="text-xs text-gray-400">#{locker.lockerNumber}</div>
+                                                    </td>
+                                                    <td className="py-3 pr-4">{locker.size}</td>
+                                                    <td className="py-3 pr-4">
+                                                        <span
+                                                            className={cn(
+                                                                'px-2 py-1 rounded-full text-xs font-semibold',
+                                                                locker.status === 'AVAILABLE'
+                                                                    ? 'bg-emerald-50 text-emerald-600'
+                                                                    : locker.status === 'MAINTENANCE' || locker.status === 'OUT_OF_SERVICE'
+                                                                    ? 'bg-amber-50 text-amber-600'
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                            )}
+                                                        >
+                                                            {locker.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-xs text-gray-500">{locker.subscriptionId || '—'}</td>
+                                                    <td className="py-3 pr-4 text-xs text-gray-500">
+                                                        {locker.nextAvailableFrom
+                                                            ? new Date(locker.nextAvailableFrom).toLocaleString()
+                                                            : locker.status === 'AVAILABLE'
+                                                            ? 'Now'
+                                                            : 'TBD'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="text-sm text-gray-500">No lockers registered for this location.</div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {!locationHierarchy.length && (
+                        <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                            No locations found. Add a location to start managing lockers.
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 
@@ -1692,6 +2110,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             {activeTab === 'overview' && renderOverview()}
             {activeTab === 'plans' && renderPlans()}
             {activeTab === 'subscriptions' && renderSubscriptions()}
+            {activeTab === 'locations' && renderLocationsManagement()}
             {activeTab === 'lockers' && renderLockers()}
             {activeTab === 'reservations' && renderReservations()}
         </div>
