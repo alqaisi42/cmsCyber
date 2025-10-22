@@ -234,8 +234,7 @@ class LockerManagementService {
             const response = await this.fetchWithAlternatives<LockerLocationStats[]>(
                 [
                     `${this.locationsUrl}/stats`,
-                    `${this.locationsUrl}`,
-                    `${this.locationsUrl}/list`,
+                    `${this.adminBaseUrl}/locations/stats`,
                 ],
                 token
             );
@@ -263,6 +262,7 @@ class LockerManagementService {
                     [
                         `${this.locationsUrl}/tree`,
                         `${this.baseUrl}/locations/tree`,
+                        `${this.adminBaseUrl}/locations/tree`,
                     ],
                     token
                 ),
@@ -374,45 +374,83 @@ class LockerManagementService {
     }
 
     async getLockersByLocation(locationId: string, token?: string): Promise<LockerApiResponse<LockerSummary[]>> {
+        const buildUrl = (page: number) => {
+            const params = new URLSearchParams({
+                locationId,
+                page: String(page),
+                sort: 'lockerNumber,asc',
+            });
+
+            return `${this.baseUrl}?${params.toString()}`;
+        };
+
         try {
-            const candidateEndpoints = [
-                `${this.locationsUrl}/${locationId}/lockers`,
-                `${this.adminBaseUrl}/locations/${locationId}/lockers`,
-            ];
-
-            for (const endpoint of candidateEndpoints) {
-                const response = await fetch(endpoint, {
-                    cache: 'no-store',
-                    headers: this.getHeaders(token),
-                });
-
-                if (response.ok) {
-                    return await response.json();
-                }
-
-                console.warn(`Locker lookup endpoint ${endpoint} failed with status ${response.status}.`);
-            }
-
-            const params = new URLSearchParams({ locationId, page: '0', sort: 'lockerNumber,asc' });
-            const secondaryResponse = await fetch(`${this.baseUrl}?${params.toString()}`, {
+            const firstResponse = await fetch(buildUrl(0), {
                 cache: 'no-store',
                 headers: this.getHeaders(token),
             });
 
-            if (!secondaryResponse.ok) {
-                throw new Error(`HTTP error! status: ${secondaryResponse.status}`);
+            if (!firstResponse.ok) {
+                throw new Error(`HTTP error! status: ${firstResponse.status}`);
             }
 
-            const payload: LockerPagedResponse<LockerSummary> = await secondaryResponse.json();
+            const firstPayload: LockerPagedResponse<LockerSummary> = await firstResponse.json();
+            const lockers: LockerSummary[] = [...(firstPayload.data?.content ?? [])];
+            const totalPages = firstPayload.data?.totalPages ?? 1;
+            const aggregatedErrors = new Set<string>(firstPayload.errors ?? []);
+            let latestMessage = firstPayload.message;
+            let latestTimestamp = firstPayload.timestamp;
+
+            for (let page = 1; page < totalPages; page += 1) {
+                const pagedResponse = await fetch(buildUrl(page), {
+                    cache: 'no-store',
+                    headers: this.getHeaders(token),
+                });
+
+                if (!pagedResponse.ok) {
+                    throw new Error(`HTTP error! status: ${pagedResponse.status}`);
+                }
+
+                const pagedPayload: LockerPagedResponse<LockerSummary> = await pagedResponse.json();
+                lockers.push(...(pagedPayload.data?.content ?? []));
+                (pagedPayload.errors ?? []).forEach((error) => error && aggregatedErrors.add(error));
+                latestMessage = pagedPayload.message || latestMessage;
+                latestTimestamp = pagedPayload.timestamp || latestTimestamp;
+            }
+
             return {
-                success: payload.success,
-                data: payload.data?.content ?? [],
-                message: payload.message,
-                errors: payload.errors,
-                timestamp: payload.timestamp,
+                success: firstPayload.success,
+                data: lockers,
+                message: latestMessage || 'Lockers retrieved successfully',
+                errors: Array.from(aggregatedErrors),
+                timestamp: latestTimestamp || new Date().toISOString(),
             };
         } catch (error) {
             console.warn('Failed to fetch lockers for location. Using fallback data.', error);
+
+            try {
+                const availableOnly = await this.getAvailableLockersForUser(
+                    undefined,
+                    locationId,
+                    token,
+                    { scope: 'ALL_USERS' }
+                );
+
+                if (availableOnly.data?.length) {
+                    return {
+                        success: true,
+                        data: availableOnly.data,
+                        message:
+                            availableOnly.message ||
+                            'Showing available lockers while the full locker list is unavailable.',
+                        errors: [...(availableOnly.errors ?? []), 'FALLBACK_AVAILABLE_ONLY'],
+                        timestamp: new Date().toISOString(),
+                    };
+                }
+            } catch (secondaryError) {
+                console.warn('Failed to fetch available lockers fallback.', secondaryError);
+            }
+
             const filtered = FALLBACK_LOCKERS.filter((locker) => locker.locationId === locationId);
             return {
                 success: true,
