@@ -38,11 +38,20 @@ function buildBackendUrl(path: string, searchParams?: string): string {
 /**
  * Create standard headers
  */
-function createHeaders(request: NextRequest): HeadersInit {
-    const headers: HeadersInit = {
-        'Accept': '*/*',
-        'Content-Type': 'application/json',
-    };
+function createHeaders(request: NextRequest, includeBody: boolean): HeadersInit {
+    const headers: HeadersInit = {};
+
+    const acceptHeader = request.headers.get('accept');
+    if (acceptHeader) {
+        headers['Accept'] = acceptHeader;
+    } else {
+        headers['Accept'] = 'application/json, */*';
+    }
+
+    if (includeBody) {
+        const contentType = request.headers.get('content-type');
+        headers['Content-Type'] = contentType ?? 'application/json';
+    }
 
     // Forward authorization if present
     const authHeader = request.headers.get('authorization');
@@ -141,7 +150,7 @@ async function proxyRequest(
 
     try {
         const url = buildBackendUrl(path, searchParams);
-        const headers = createHeaders(request);
+        const headers = createHeaders(request, includeBody);
 
         const response = await fetch(url, {
             method,
