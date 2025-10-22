@@ -844,7 +844,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                         <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
                             <div className="absolute right-6 top-6">
                                 <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                                    {plan.isActive === false ? 'Archived' : 'Active'}
+                                    {plan.sharingEnabled ? 'Sharing enabled' : 'Sharing disabled'}
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
