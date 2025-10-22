@@ -24,22 +24,22 @@ import { useAuthStore } from '../../contexts/auth-store';
 import { lockerSubscriptionService } from '../../../infrastructure/services/locker-subscription.service';
 import { lockerManagementService } from '../../../infrastructure/services/locker-management.service';
 import {
+    ArrowUpRight,
     CalendarCheck,
     CheckCircle2,
     Clock,
     CreditCard,
+    Info,
     Layers,
+    LifeBuoy,
     Loader2,
     Lock,
     MapPin,
     Plus,
     RefreshCw,
     ShieldCheck,
-    LifeBuoy,
-    MessageSquare,
     Users,
     X,
-    Info,
 } from 'lucide-react';
 import { useToast } from '@/presentation/components/ui/toast';
 import { cn } from '../../../shared/utils/cn';
@@ -169,6 +169,35 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [calendarDetails, setCalendarDetails] = useState<Record<string, FamilyCalendarResponse>>({});
     const [calendarLoading, setCalendarLoading] = useState(false);
 
+    const fetchPlans = useCallback(async () => {
+        setPlansLoading(true);
+        try {
+            const response = await lockerSubscriptionService.getPlans();
+            setPlans(response.data);
+            setPlansMessage(response.message || null);
+
+            if (response.errors?.includes('FALLBACK_DATA')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Showing fallback plans',
+                    description:
+                        response.message || 'Using cached locker plans while the API is unreachable.',
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load plans:', error);
+            const description =
+                error instanceof Error ? error.message : 'Unexpected error retrieving plans.';
+            setPlansMessage('Unable to load subscription plans.');
+            pushToast({
+                type: 'error',
+                title: 'Failed to load plans',
+                description,
+            });
+        } finally {
+            setPlansLoading(false);
+        }
+    }, [pushToast]);
 
     useEffect(() => {
         setActiveTab(defaultTab);
@@ -197,32 +226,6 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [selectedLocationId]);
 
     useEffect(() => {
-        const loadPlans = async () => {
-            setPlansLoading(true);
-            try {
-                const response = await lockerSubscriptionService.getPlans();
-                setPlans(response.data);
-                setPlansMessage(response.message || null);
-                if (response.errors?.includes('FALLBACK_DATA')) {
-                    pushToast({
-                        type: 'warning',
-                        title: 'Showing fallback plans',
-                        description: response.message || 'Using cached locker plans while the API is unreachable.',
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load plans:', error);
-                setPlansMessage('Unable to load subscription plans.');
-                pushToast({
-                    type: 'error',
-                    title: 'Failed to load plans',
-                    description: error instanceof Error ? error.message : 'Unexpected error retrieving plans.',
-                });
-            } finally {
-                setPlansLoading(false);
-            }
-        };
-
         const loadLocations = async () => {
             setLocationsLoading(true);
             try {
@@ -287,10 +290,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             }
         };
 
-        loadPlans();
+        fetchPlans();
         loadLocations();
         loadLocationHierarchy();
-    }, [pushToast, token]);
+    }, [fetchPlans, pushToast, token]);
 
     useEffect(() => {
         if (!token || !selectedUserId) {
@@ -898,6 +901,258 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     );
 
     const renderSupport = () => <SupportIssuesWorkspace token={token ?? undefined} />;
+
+    const renderOverview = () => (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {summaryMetrics.map((metric) => {
+                    const Icon = metric.icon;
+                    return (
+                        <div key={metric.label} className="bg-white rounded-xl shadow-sm p-5">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-500">{metric.label}</p>
+                                    <p className="text-3xl font-bold text-gray-900 mt-1">{metric.value}</p>
+                                    <p className="text-xs text-gray-400 mt-2">{metric.description}</p>
+                                </div>
+                                <span className={cn('p-3 rounded-full', metric.color)}>
+                                    <Icon className="w-5 h-5" />
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Active Plans</h3>
+                            <p className="text-sm text-gray-500">Quick view of active locker subscriptions</p>
+                        </div>
+                        <button
+                            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            onClick={() => setActiveTab('subscriptions')}
+                        >
+                            Manage
+                            <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {activePlansLoading && (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                            </div>
+                        )}
+                        {activePlansError && (
+                            <div className="border border-red-100 bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3">
+                                {activePlansError}
+                            </div>
+                        )}
+                        {!activePlansLoading && !activePlansError && !activePlans.length && (
+                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                                No active subscriptions found for this user. Try selecting a different user ID.
+                            </div>
+                        )}
+                        {activePlans.slice(0, 3).map((subscription) => {
+                            const usedLockers =
+                                subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
+                            const billingLabel = subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly';
+                            return (
+                                <div key={subscription.id} className="border border-gray-100 rounded-lg p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{subscription.subscriptionPlan.planName}</p>
+                                            <p className="text-sm text-gray-500">{subscription.location.name}</p>
+                                        </div>
+                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                            {subscription.subscriptionStatus}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-3 gap-4 text-xs text-gray-500">
+                                        <div>
+                                            <p className="text-gray-400">Billing</p>
+                                            <p className="font-semibold text-gray-700">{billingLabel}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400">Usage</p>
+                                            <p className="font-semibold text-gray-700">
+                                                {usedLockers}/{subscription.currentUsage.totalCapacity} lockers
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-400">Active until</p>
+                                            <p className="font-semibold text-gray-700">
+                                                {new Date(subscription.endDate).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Locker Availability</h3>
+                            <p className="text-sm text-gray-500">Monitor available capacity by location</p>
+                        </div>
+                        <button
+                            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            onClick={() => setActiveTab('lockers')}
+                        >
+                            Explore
+                            <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {locations.slice(0, 4).map((location) => (
+                            <div key={location.id} className="border border-gray-100 rounded-lg p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">{location.name}</p>
+                                        <p className="text-xs text-gray-500">{location.address}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-semibold text-emerald-600">{location.availableLockers} free</p>
+                                        <p className="text-xs text-gray-400">of {location.totalLockers} lockers</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {!locations.length && (
+                            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                                No locations configured yet.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <span className="p-3 rounded-xl bg-blue-50 text-blue-600">
+                            <LifeBuoy className="w-5 h-5" />
+                        </span>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Support & Issues workspace</h3>
+                            <p className="text-sm text-gray-500">
+                                Review incidents, drag issues across swimlanes, and trigger toasts for success or recovery states.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        onClick={() => setActiveTab('support')}
+                    >
+                        Open workspace
+                        <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500">
+                    <div className="border border-blue-100 rounded-lg p-4 bg-blue-50/40">
+                        <p className="font-semibold text-gray-800">Kanban control</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Drag locker issues between statuses to mirror live API updates without leaving the dashboard.
+                        </p>
+                    </div>
+                    <div className="border border-emerald-100 rounded-lg p-4 bg-emerald-50/40">
+                        <p className="font-semibold text-gray-800">Maintenance context</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Preview latest maintenance records and usage impact while resolving incidents.
+                        </p>
+                    </div>
+                    <div className="border border-amber-100 rounded-lg p-4 bg-amber-50/40">
+                        <p className="font-semibold text-gray-800">Toast feedback</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Every action surfaces success or recovery toasts so admins stay confident in their updates.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderPlans = () => (
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
+                    <p className="text-gray-500">Compare available locker subscriptions and their benefits.</p>
+                </div>
+                <button
+                    onClick={() => fetchPlans()}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm"
+                    disabled={plansLoading}
+                >
+                    {plansLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Refresh
+                </button>
+            </div>
+            {plansMessage && (
+                <div className="bg-blue-50 text-blue-700 text-sm rounded-lg px-4 py-3">{plansMessage}</div>
+            )}
+            {plansLoading ? (
+                <div className="flex justify-center items-center h-40">
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+            ) : plans.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {plans.map((plan) => (
+                        <div
+                            key={plan.id}
+                            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden"
+                        >
+                            <div className="absolute right-6 top-6">
+                                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
+                                    {plan.sharingEnabled ? 'Sharing enabled' : 'Sharing disabled'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+                                    <Layers className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-semibold text-gray-900">{plan.planName}</h3>
+                                    <p className="text-sm text-gray-500">{plan.description || `Plan code: ${plan.planCode}`}</p>
+                                </div>
+                            </div>
+                            <div className="mt-6 flex items-baseline gap-2">
+                                <p className="text-3xl font-bold text-gray-900">${plan.monthlyPrice}</p>
+                                <span className="text-sm text-gray-400">/ month</span>
+                            </div>
+                            <p className="text-xs text-gray-400">${plan.annualPrice} billed yearly</p>
+                            <ul className="mt-6 space-y-2">
+                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Up to {plan.lockerCapacity} lockers
+                                </li>
+                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {plan.maxConcurrentReservations} concurrent reservations
+                                </li>
+                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    {plan.sharingEnabled
+                                        ? `Share with up to ${plan.maxSharedUsers} users`
+                                        : 'Sharing disabled'}
+                                </li>
+                                <li className="flex items-center gap-2 text-sm text-gray-600">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Plan code: {plan.planCode}
+                                </li>
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                    No plans available at the moment.
+                </div>
+            )}
+        </div>
+    );
 
     const renderSubscriptions = () => (
         <div className="space-y-6">
