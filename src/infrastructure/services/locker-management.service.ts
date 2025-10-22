@@ -129,7 +129,9 @@ const FALLBACK_LOCATION_TREE: LockerLocationWithLockers[] = FALLBACK_LOCATIONS.m
 });
 
 class LockerManagementService {
-    private readonly baseUrl = '/api/v1/admin/lockers';
+    private readonly adminBaseUrl = '/api/v1/admin';
+    private readonly baseUrl = `${this.adminBaseUrl}/lockers`;
+    private readonly locationsUrl = `${this.adminBaseUrl}/locker-locations`;
     private readonly calendarUrl = '/api/v1/family-calendar';
 
     private resolveToken(explicitToken?: string): string | null {
@@ -158,18 +160,42 @@ class LockerManagementService {
         return headers;
     }
 
+    private async fetchWithAlternatives<T>(endpoints: string[], token?: string): Promise<LockerApiResponse<T>> {
+        const errors: unknown[] = [];
+
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    cache: 'no-store',
+                    headers: this.getHeaders(token),
+                });
+
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => null);
+                    const message = payload?.message || `HTTP error! status: ${response.status}`;
+                    throw new Error(message);
+                }
+
+                return await response.json();
+            } catch (error) {
+                errors.push(error);
+            }
+        }
+
+        throw errors[errors.length - 1] ?? new Error('No endpoints available');
+    }
+
     async getLocations(token?: string): Promise<LockerApiResponse<LockerLocation[]>> {
         try {
-            const response = await fetch(`${this.baseUrl}/locations`, {
-                cache: 'no-store',
-                headers: this.getHeaders(token),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
+            return await this.fetchWithAlternatives<LockerLocation[]>(
+                [
+                    `${this.locationsUrl}`,
+                    `${this.locationsUrl}/list`,
+                    `${this.adminBaseUrl}/locations`,
+                    `${this.baseUrl}/locations`,
+                ],
+                token
+            );
         } catch (error) {
             console.warn('Failed to fetch locker locations. Using fallback data.', error);
             return {
@@ -184,46 +210,98 @@ class LockerManagementService {
 
     async getLocationsHierarchy(token?: string): Promise<LockerApiResponse<LockerLocationWithLockers[]>> {
         try {
-            const response = await fetch(`${this.baseUrl}/locations/tree`, {
-                cache: 'no-store',
-                headers: this.getHeaders(token),
-            });
+            const hierarchy = await this.fetchWithAlternatives<LockerLocationWithLockers[]>(
+                [
+                    `${this.locationsUrl}/with-lockers`,
+                    `${this.locationsUrl}/hierarchy`,
+                    `${this.adminBaseUrl}/locations/with-lockers`,
+                    `${this.baseUrl}/locations/tree`,
+                ],
+                token
+            );
+            return hierarchy;
+        } catch (primaryError) {
+            console.warn('Failed to fetch location locker hierarchy from dedicated endpoint. Attempting manual aggregation.', primaryError);
+            try {
+                const locationsResponse = await this.getLocations(token);
+                if (!locationsResponse.data?.length) {
+                    throw new Error('No locations returned for hierarchy aggregation');
+                }
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const aggregatedErrors = new Set<string>();
+
+                const lockersByLocation = await Promise.all(
+                    locationsResponse.data.map(async (location) => {
+                        const lockersResponse = await this.getLockersByLocation(location.id, token);
+
+                        lockersResponse.errors?.forEach((error) => {
+                            if (error) {
+                                aggregatedErrors.add(error);
+                            }
+                        });
+
+                        return {
+                            location,
+                            lockers: lockersResponse.data,
+                            totalLockers: lockersResponse.data.length,
+                            availableLockers: lockersResponse.data.filter((locker) => locker.status === 'AVAILABLE').length,
+                            maintenanceCount: lockersResponse.data.filter((locker) => locker.status === 'MAINTENANCE').length,
+                            issueCount: 0,
+                        } satisfies LockerLocationWithLockers;
+                    })
+                );
+
+                return {
+                    success: true,
+                    data: lockersByLocation,
+                    message: 'Locations hierarchy constructed from locker listings',
+                    errors: Array.from(aggregatedErrors),
+                    timestamp: new Date().toISOString(),
+                };
+            } catch (error) {
+                console.warn('Failed to aggregate location hierarchy. Using fallback data.', error);
+                return {
+                    success: true,
+                    data: FALLBACK_LOCATION_TREE,
+                    message: 'Showing fallback location hierarchy',
+                    errors: ['FALLBACK_DATA'],
+                    timestamp: new Date().toISOString(),
+                };
             }
-
-            return await response.json();
-        } catch (error) {
-            console.warn('Failed to fetch location locker hierarchy. Using fallback data.', error);
-            return {
-                success: true,
-                data: FALLBACK_LOCATION_TREE,
-                message: 'Showing fallback location hierarchy',
-                errors: ['FALLBACK_DATA'],
-                timestamp: new Date().toISOString(),
-            };
         }
     }
 
     async getLockersByLocation(locationId: string, token?: string): Promise<LockerApiResponse<LockerSummary[]>> {
         try {
-            const params = new URLSearchParams({
-                locationId,
-                page: '0',
-                size: '50',
-                sort: 'lockerNumber,asc',
-            });
-            const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
+            const candidateEndpoints = [
+                `${this.locationsUrl}/${locationId}/lockers`,
+                `${this.adminBaseUrl}/locations/${locationId}/lockers`,
+            ];
+
+            for (const endpoint of candidateEndpoints) {
+                const response = await fetch(endpoint, {
+                    cache: 'no-store',
+                    headers: this.getHeaders(token),
+                });
+
+                if (response.ok) {
+                    return await response.json();
+                }
+
+                console.warn(`Locker lookup endpoint ${endpoint} failed with status ${response.status}.`);
+            }
+
+            const params = new URLSearchParams({ locationId, page: '0', sort: 'lockerNumber,asc' });
+            const secondaryResponse = await fetch(`${this.baseUrl}?${params.toString()}`, {
                 cache: 'no-store',
                 headers: this.getHeaders(token),
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (!secondaryResponse.ok) {
+                throw new Error(`HTTP error! status: ${secondaryResponse.status}`);
             }
 
-            const payload: LockerPagedResponse<LockerSummary> = await response.json();
+            const payload: LockerPagedResponse<LockerSummary> = await secondaryResponse.json();
             return {
                 success: payload.success,
                 data: payload.data?.content ?? [],
