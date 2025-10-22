@@ -189,11 +189,31 @@ export class LockerAdminRepository {
         lockerId: string,
         status?: LockerIssueStatus
     ): Promise<LockerIssue[]> {
-        const queryParams = status ? `?status=${status}` : '';
-        const response = await apiClient.get<ApiResponse<LockerIssue[]>>(
-            `${this.baseUrl}/${lockerId}/issues${queryParams}`
+        const queryParams = new URLSearchParams();
+        if (status) {
+            queryParams.set('status', status);
+        }
+
+        const response = await apiClient.get<
+            ApiResponse<LockerIssue[] | SpringBootPageResponse<LockerIssue>>
+        >(
+            `${this.baseUrl}/${lockerId}/issues${
+                queryParams.toString() ? `?${queryParams.toString()}` : ''
+            }`
         );
-        return response.data;
+
+        const rawIssues = response.data;
+        const issuesArray = Array.isArray(rawIssues)
+            ? rawIssues
+            : this.isSpringPageResponse<LockerIssue>(rawIssues)
+                ? rawIssues.content
+                : [];
+
+        if (!Array.isArray(rawIssues) && !this.isSpringPageResponse<LockerIssue>(rawIssues)) {
+            console.warn('Unexpected response format from getLockerIssues:', rawIssues);
+        }
+
+        return issuesArray.map((issue) => this.normalizeLockerIssue(issue));
     }
 
     /**
@@ -204,7 +224,7 @@ export class LockerAdminRepository {
             `${this.baseUrl}/${data.lockerId}/issues?userId=${userId}`,
             data
         );
-        return response.data;
+        return this.normalizeLockerIssue(response.data);
     }
 
 
@@ -220,7 +240,7 @@ export class LockerAdminRepository {
             `${this.baseUrl}/issues/${issueId}`,
             data
         );
-        return response.data;
+        return this.normalizeLockerIssue(response.data);
     }
 
     /**
@@ -234,7 +254,7 @@ export class LockerAdminRepository {
             `${this.baseUrl}/issues/${issueId}/resolve`,
             data
         );
-        return response.data;
+        return this.normalizeLockerIssue(response.data);
     }
 
     /**
@@ -242,21 +262,27 @@ export class LockerAdminRepository {
      */
     async getAllOpenIssues(): Promise<LockerIssue[]> {
         try {
-            const response = await apiClient.get<ApiResponse<LockerIssue[]>>(
-                `${this.baseUrl}/issues`,
-                {
-                    // params: { status: 'OPEN,IN_PROGRESS' },
-                    headers: { Accept: 'application/json' },
-                }
-            );
+            const response = await apiClient.get<
+                ApiResponse<LockerIssue[] | SpringBootPageResponse<LockerIssue>>
+            >(`${this.baseUrl}/issues`, {
+                headers: { Accept: 'application/json' },
+            });
 
-            // ✅ If backend returns an array directly
-            if (Array.isArray(response.data)) {
-                return response.data;
+            const rawIssues = response.data;
+            const issuesArray = Array.isArray(rawIssues)
+                ? rawIssues
+                : this.isSpringPageResponse<LockerIssue>(rawIssues)
+                    ? rawIssues.content
+                    : [];
+
+            if (!Array.isArray(rawIssues) && !this.isSpringPageResponse<LockerIssue>(rawIssues)) {
+                console.warn(
+                    'Unexpected response format from getAllOpenIssues:',
+                    rawIssues
+                );
             }
 
-            console.warn('Unexpected response format from getAllOpenIssues:', response.data);
-            return [];
+            return issuesArray.map((issue) => this.normalizeLockerIssue(issue));
         } catch (error: any) {
             console.error('Failed to fetch open issues:', error);
             throw new Error(error?.message ?? 'Failed to fetch open issues');
@@ -347,6 +373,26 @@ export class LockerAdminRepository {
     //     const response = await apiClient.get(`${this.baseUrl}/stats`);
     //     return response.data;
     // }
+    private isSpringPageResponse<T>(value: unknown): value is SpringBootPageResponse<T> {
+        return (
+            !!value &&
+            typeof value === 'object' &&
+            Array.isArray((value as SpringBootPageResponse<T>).content)
+        );
+    }
+
+    private normalizeLockerIssue(issue: any): LockerIssue {
+        return {
+            ...issue,
+            attachments: Array.isArray(issue?.attachments) ? issue.attachments : [],
+            commentsCount:
+                typeof issue?.commentsCount === 'number' ? issue.commentsCount : 0,
+            statusHistory: Array.isArray(issue?.statusHistory)
+                ? issue.statusHistory
+                : [],
+        };
+    }
+
     private normalizeLockerSummary(locker: any): LockerSummary {
         return {
             id: locker.id,
