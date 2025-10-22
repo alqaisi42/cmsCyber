@@ -81,11 +81,13 @@ export interface LockerSummary {
     id: string;
     code: string;
     lockerNumber: string;
+    name?: string;
     subscriptionId?: string;
     locationId: string;
     locationName?: string;
     size: LockerSize;
     status: LockerStatus;
+    maintenanceStatus?: 'OPERATIONAL' | 'REQUIRES_MAINTENANCE' | 'UNDER_MAINTENANCE';
     dimensions?: LockerDimensions;
     features?: string[];
     currentReservation?: LockerReservation | null;
@@ -222,6 +224,27 @@ export interface LockerMaintenanceRecord {
     createdAt: string;
 }
 
+export interface LockerDetailLocation {
+    id: string;
+    code: string;
+    name: string;
+    address?: string;
+}
+
+export interface LockerActiveReservation {
+    id: string;
+    userId: number;
+    lockerId: string;
+    lockerNumber?: string;
+    orderId?: string;
+    reservedFrom: string;
+    reservedUntil: string;
+    reservationType: string;
+    status: string;
+    accessCode?: string;
+    createdAt: string;
+}
+
 export interface LockerLocationWithLockers {
     location: LockerLocation;
     lockers: LockerSummary[];
@@ -292,13 +315,18 @@ export interface FamilyCalendarTimeSlot {
 }
 
 export interface LockerDetails extends LockerSummary {
-    description?: string;
-    features: string[];
-    accessCode?: string;
+    description?: string | null;
+    isActive: boolean;
+    maintenanceStatus?: 'OPERATIONAL' | 'REQUIRES_MAINTENANCE' | 'UNDER_MAINTENANCE';
+    lastMaintenanceDate?: string | null;
+    nextMaintenanceDue?: string | null;
+    location?: LockerDetailLocation;
+    activeReservations: LockerActiveReservation[];
     maintenanceHistory: LockerMaintenanceRecord[];
-    reservationHistory: LockerReservation[];
-    issues: LockerIssue[];
-    metadata: Record<string, any>;
+    issueReports?: LockerIssue[];
+    metadata?: Record<string, any>;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface FamilyCalendarResponse {

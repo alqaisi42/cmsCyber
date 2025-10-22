@@ -10,7 +10,9 @@ import {
     ResolveLockerIssuePayload,
     LockerStatus,
     LockerSize,
-    LockerIssueStatus, LockerDetails,
+    LockerIssueStatus,
+    LockerDetails,
+    LockerActiveReservation,
 } from '../../core/entities/lockers';
 import {
     ApiResponse,
@@ -104,21 +106,26 @@ export class LockerAdminRepository {
         if (filters.size !== undefined) queryParams.append('size', String(filters.size));
         if (filters.sort) queryParams.append('sort', filters.sort);
 
-        const response = await apiClient.get<ApiResponse<SpringBootPageResponse<LockerSummary>>>(
+        const response = await apiClient.get<ApiResponse<SpringBootPageResponse<any>>>(
             `${this.baseUrl}?${queryParams.toString()}`
         );
 
-        return transformSpringPageToPaginated(response.data);
+        const paginated = transformSpringPageToPaginated(response.data);
+
+        return {
+            ...paginated,
+            data: paginated.data.map((locker) => this.normalizeLockerSummary(locker)),
+        };
     }
 
     /**
      * Get locker details by ID
      */
     async getLockerById(lockerId: string): Promise<LockerDetails> {
-        const response = await apiClient.get<ApiResponse<LockerDetails>>(
+        const response = await apiClient.get<ApiResponse<any>>(
             `${this.baseUrl}/${lockerId}`
         );
-        return response.data;
+        return this.normalizeLockerDetails(response.data);
     }
 
     /**
@@ -323,6 +330,75 @@ export class LockerAdminRepository {
     //     const response = await apiClient.get(`${this.baseUrl}/stats`);
     //     return response.data;
     // }
+    private normalizeLockerSummary(locker: any): LockerSummary {
+        return {
+            id: locker.id,
+            code: locker.code,
+            lockerNumber: locker.lockerNumber !== undefined && locker.lockerNumber !== null
+                ? String(locker.lockerNumber)
+                : locker.name ?? locker.code,
+            name: locker.name,
+            subscriptionId: locker.subscriptionId,
+            locationId: locker.location?.id ?? locker.locationId ?? '',
+            locationName: locker.location?.name ?? locker.locationName,
+            size: locker.size,
+            status: locker.status,
+            maintenanceStatus: locker.maintenanceStatus,
+            description: locker.description,
+            isActive: locker.isActive,
+            maxCapacity: locker.maxCapacity,
+            availableCapacity: locker.availableCapacity,
+        };
+    }
+
+    private normalizeActiveReservation(reservation: any): LockerActiveReservation {
+        return {
+            id: reservation.id,
+            userId: reservation.userId,
+            lockerId: reservation.lockerId,
+            lockerNumber: reservation.lockerNumber ? String(reservation.lockerNumber) : undefined,
+            orderId: reservation.orderId,
+            reservedFrom: reservation.reservedFrom,
+            reservedUntil: reservation.reservedUntil,
+            reservationType: reservation.reservationType,
+            status: reservation.status,
+            accessCode: reservation.accessCode,
+            createdAt: reservation.createdAt,
+        };
+    }
+
+    private normalizeMaintenanceRecord(record: any): LockerMaintenanceRecord {
+        return {
+            ...record,
+            tasks: record.tasks ?? [],
+            completedTasks: record.completedTasks ?? [],
+            partsUsed: record.partsUsed ?? [],
+        };
+    }
+
+    private normalizeLockerDetails(locker: any): LockerDetails {
+        const summary = this.normalizeLockerSummary(locker);
+
+        return {
+            ...summary,
+            description: locker.description ?? null,
+            isActive: locker.isActive ?? true,
+            maintenanceStatus: locker.maintenanceStatus,
+            lastMaintenanceDate: locker.lastMaintenanceDate ?? null,
+            nextMaintenanceDue: locker.nextMaintenanceDue ?? null,
+            location: locker.location,
+            activeReservations: Array.isArray(locker.activeReservations)
+                ? locker.activeReservations.map((reservation: any) => this.normalizeActiveReservation(reservation))
+                : [],
+            maintenanceHistory: Array.isArray(locker.maintenanceHistory)
+                ? locker.maintenanceHistory.map((record: any) => this.normalizeMaintenanceRecord(record))
+                : [],
+            issueReports: Array.isArray(locker.issueReports) ? locker.issueReports : [],
+            metadata: locker.metadata ?? undefined,
+            createdAt: locker.createdAt,
+            updatedAt: locker.updatedAt,
+        };
+    }
 }
 
 // Export singleton instance

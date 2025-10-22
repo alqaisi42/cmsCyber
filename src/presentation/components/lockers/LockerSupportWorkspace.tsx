@@ -1,33 +1,21 @@
 // src/presentation/components/lockers/LockerSupportWorkspace.tsx
 'use client';
 
-import React, {useState, useEffect, useCallback} from 'react';
-import {DragDropContext, Droppable, Draggable, DropResult} from '@hello-pangea/dnd';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
     AlertCircle,
-    Clock,
-    CheckCircle,
-    XCircle,
-    ChevronRight,
-    User,
-    Calendar,
-    AlertTriangle,
     Wrench,
-    Settings as Tool,
     Package,
     MapPin,
-    Activity,
-    Filter,
     Search,
     Plus,
     RefreshCw,
-    Settings,
 } from 'lucide-react';
 import {
     LockerSummary,
     LockerIssue,
-    LockerMaintenanceRecord,
     LockerIssueStatus,
+    LockerDetails,
 } from '../../../core/entities/lockers';
 import {lockerAdminRepository} from '../../../infrastructure/repositories/locker-admin.repository';
 import {cn} from '../../../shared/utils/cn';
@@ -35,6 +23,9 @@ import IssueKanbanBoard, {IssueSeverity} from './IssueKanbanBoard';
 import MaintenanceHistoryPanel from './MaintenanceHistoryPanel';
 import {useToast} from "@/presentation/components/ui/toast";
 import {useAllOpenIssues, useMaintenanceHistory} from "@/presentation/hooks/useLockerSupport";
+import IssueDetailPanel from './IssueDetailPanel';
+import CreateIssueModal from './CreateIssueModal';
+import LockerDetailOverview from './LockerDetailOverview';
 
 // ==========================================
 // TYPES
@@ -57,12 +48,13 @@ interface FilterState {
 export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
     const {pushToast} = useToast();
     const {issues: allOpenIssues, loading: loadingIssues, refresh: refreshIssues} = useAllOpenIssues();
-    const {history: maintenanceHistory, loading: loadingMaintenance, loadMaintenanceHistory} = useMaintenanceHistory();
+    const {history: maintenanceHistory, loadMaintenanceHistory} = useMaintenanceHistory();
 
     // State
     const [lockers, setLockers] = useState<LockerSummary[]>([]);
     const [selectedLockerId, setSelectedLockerId] = useState<string | null>(null);
     const [filteredIssues, setFilteredIssues] = useState<LockerIssue[]>([]);
+    const [selectedLockerDetails, setSelectedLockerDetails] = useState<LockerDetails | null>(null);
     const [filters, setFilters] = useState<FilterState>({
         severity: 'ALL',
         location: '',
@@ -70,7 +62,10 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
     });
     const [showMaintenancePanel, setShowMaintenancePanel] = useState(false);
     const [loadingLockers, setLoadingLockers] = useState(false);
+    const [loadingLockerDetails, setLoadingLockerDetails] = useState(false);
     const [updatingIssue, setUpdatingIssue] = useState(false);
+    const [selectedIssue, setSelectedIssue] = useState<LockerIssue | null>(null);
+    const [showCreateIssueModal, setShowCreateIssueModal] = useState(false);
 
     // Load lockers with issues
     const loadLockersWithIssues = useCallback(async () => {
@@ -98,6 +93,23 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
             setLoadingLockers(false);
         }
     }, [selectedLockerId, pushToast]);
+
+    const loadLockerDetails = useCallback(async (lockerId: string) => {
+        setLoadingLockerDetails(true);
+        try {
+            const details = await lockerAdminRepository.getLockerById(lockerId);
+            setSelectedLockerDetails(details);
+        } catch (error) {
+            console.error('Failed to load locker details:', error);
+            pushToast({
+                type: 'error',
+                title: 'Error',
+                description: 'Unable to load locker details',
+            });
+        } finally {
+            setLoadingLockerDetails(false);
+        }
+    }, [pushToast]);
 
     // Filter issues based on selected locker and filters
     useEffect(() => {
@@ -154,22 +166,124 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
 
     // Handle issue click
     const handleIssueClick = (issue: LockerIssue) => {
-        // Open issue detail panel or modal
-        console.log('Issue clicked:', issue);
-        // TODO: Implement issue detail view
+        setSelectedIssue(issue);
     };
 
-    // Load maintenance history when locker is selected
+    const handleIssueDetailUpdate = async (issueId: string, data: any) => {
+        setUpdatingIssue(true);
+        try {
+            await lockerAdminRepository.updateIssue(issueId, data);
+
+            pushToast({
+                type: 'success',
+                title: 'Issue Updated',
+                description: 'Issue details were updated successfully.',
+            });
+
+            const refreshed = await refreshIssues();
+            if (refreshed) {
+                const latest = refreshed.find(issue => issue.id === issueId);
+                if (latest) {
+                    setSelectedIssue(latest);
+                }
+            }
+
+            if (selectedLockerId) {
+                await loadLockerDetails(selectedLockerId);
+            }
+        } catch (error) {
+            console.error('Failed to update issue:', error);
+            pushToast({
+                type: 'error',
+                title: 'Update Failed',
+                description: 'Unable to update the selected issue.',
+            });
+        } finally {
+            setUpdatingIssue(false);
+        }
+    };
+
+    const handleIssueDetailResolve = async (issueId: string, data: any) => {
+        setUpdatingIssue(true);
+        try {
+            await lockerAdminRepository.resolveIssue(issueId, data);
+
+            pushToast({
+                type: 'success',
+                title: 'Issue Resolved',
+                description: 'The locker issue has been resolved.',
+            });
+
+            const refreshed = await refreshIssues();
+            if (refreshed) {
+                const latest = refreshed.find(issue => issue.id === issueId);
+                setSelectedIssue(latest ?? null);
+            } else {
+                setSelectedIssue(null);
+            }
+
+            await loadLockersWithIssues();
+            if (selectedLockerId) {
+                await loadLockerDetails(selectedLockerId);
+            }
+        } catch (error) {
+            console.error('Failed to resolve issue:', error);
+            pushToast({
+                type: 'error',
+                title: 'Resolution Failed',
+                description: 'Unable to resolve the selected issue.',
+            });
+        } finally {
+            setUpdatingIssue(false);
+        }
+    };
+
+    // Load maintenance history and locker details when locker is selected
     useEffect(() => {
         if (selectedLockerId) {
             loadMaintenanceHistory(selectedLockerId);
+            loadLockerDetails(selectedLockerId);
+        } else {
+            setSelectedLockerDetails(null);
         }
-    }, [selectedLockerId, loadMaintenanceHistory]);
+    }, [selectedLockerId, loadMaintenanceHistory, loadLockerDetails]);
 
     // Initial load
     useEffect(() => {
         loadLockersWithIssues();
     }, []);
+
+    useEffect(() => {
+        if (!selectedIssue) return;
+        const latest = allOpenIssues.find(issue => issue.id === selectedIssue.id);
+        if (latest && latest !== selectedIssue) {
+            setSelectedIssue(latest);
+        }
+    }, [allOpenIssues, selectedIssue]);
+
+    useEffect(() => {
+        if (!selectedLockerDetails) return;
+        setSelectedLockerDetails(prev => prev ? ({
+            ...prev,
+            maintenanceHistory: maintenanceHistory,
+        }) : prev);
+    }, [maintenanceHistory]);
+
+    const selectedLockerIssueCount = useMemo(() => {
+        if (!selectedLockerId) {
+            return filteredIssues.length;
+        }
+        return allOpenIssues.filter(issue => issue.lockerId === selectedLockerId).length;
+    }, [allOpenIssues, filteredIssues.length, selectedLockerId]);
+
+    const handleIssueCreationSuccess = useCallback(async () => {
+        setShowCreateIssueModal(false);
+        await refreshIssues();
+        await loadLockersWithIssues();
+        if (selectedLockerId) {
+            await loadLockerDetails(selectedLockerId);
+        }
+    }, [refreshIssues, loadLockersWithIssues, selectedLockerId, loadLockerDetails]);
 
     return (
         <div className="h-full flex flex-col bg-gray-50">
@@ -192,6 +306,7 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
                             Refresh
                         </button>
                         <button
+                            onClick={() => setShowCreateIssueModal(true)}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                             <Plus className="w-4 h-4"/>
                             Report Issue
@@ -345,36 +460,46 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
                     </div>
                 </div>
 
-                {/* Main Content - Kanban Board */}
-                <div className="flex-1 p-6 overflow-auto">
-                    {loadingIssues ? (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center">
-                                <div
-                                    className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                                <p className="text-gray-500">Loading issues...</p>
-                            </div>
-                        </div>
-                    ) : filteredIssues.length === 0 ? (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center">
-                                <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Issues Found</h3>
-                                <p className="text-gray-500">
-                                    {selectedLockerId
-                                        ? 'This locker has no active issues'
-                                        : 'Select a locker to view its issues'}
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <IssueKanbanBoard
-                            issues={filteredIssues}
-                            onIssueClick={handleIssueClick}
-                            onStatusChange={handleIssueStatusChange}
-                            loading={updatingIssue}
+                {/* Main Content - Details + Kanban */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <LockerDetailOverview
+                            locker={selectedLockerDetails}
+                            loading={loadingLockerDetails && !!selectedLockerId}
+                            issueCount={selectedLockerIssueCount}
+                            onViewMaintenance={() => setShowMaintenancePanel(true)}
                         />
-                    )}
+
+                        <div className="bg-transparent">
+                            {loadingIssues ? (
+                                <div className="flex items-center justify-center h-64">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                        <p className="text-gray-500">Loading issues...</p>
+                                    </div>
+                                </div>
+                            ) : filteredIssues.length === 0 ? (
+                                <div className="flex items-center justify-center h-64">
+                                    <div className="text-center">
+                                        <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Issues Found</h3>
+                                        <p className="text-gray-500">
+                                            {selectedLockerId
+                                                ? 'This locker has no active issues'
+                                                : 'Select a locker to view its issues'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <IssueKanbanBoard
+                                    issues={filteredIssues}
+                                    onIssueClick={handleIssueClick}
+                                    onStatusChange={handleIssueStatusChange}
+                                    loading={updatingIssue}
+                                />
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -384,6 +509,24 @@ export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
                     lockerId={selectedLockerId}
                     records={maintenanceHistory}
                     onClose={() => setShowMaintenancePanel(false)}
+                />
+            )}
+
+            {selectedIssue && (
+                <IssueDetailPanel
+                    issue={selectedIssue}
+                    onClose={() => setSelectedIssue(null)}
+                    onUpdate={handleIssueDetailUpdate}
+                    onResolve={handleIssueDetailResolve}
+                />
+            )}
+
+            {showCreateIssueModal && (
+                <CreateIssueModal
+                    onClose={() => setShowCreateIssueModal(false)}
+                    onSuccess={handleIssueCreationSuccess}
+                    defaultLockerId={selectedLockerId ?? undefined}
+                    lockerCode={selectedLockerDetails?.code}
                 />
             )}
         </div>

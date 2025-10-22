@@ -1,7 +1,7 @@
 // src/presentation/components/lockers/CreateIssueModal.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, AlertCircle, Send } from 'lucide-react';
 import { lockerAdminRepository, ReportLockerIssueRequest } from '@/infrastructure/repositories/locker-admin.repository';
 import { cn } from '@/shared/utils/cn';
@@ -13,6 +13,8 @@ import { cn } from '@/shared/utils/cn';
 interface CreateIssueModalProps {
     onClose: () => void;
     onSuccess: () => void;
+    defaultLockerId?: string;
+    lockerCode?: string;
 }
 
 const ISSUE_TYPES = [
@@ -38,9 +40,9 @@ const SEVERITY_OPTIONS = [
 // COMPONENT
 // ==========================================
 
-export function CreateIssueModal({ onClose, onSuccess }: CreateIssueModalProps) {
+export function CreateIssueModal({ onClose, onSuccess, defaultLockerId, lockerCode }: CreateIssueModalProps) {
     const [formData, setFormData] = useState<Omit<ReportLockerIssueRequest, 'lockerId'> & { lockerId: string }>({
-        lockerId: '',
+        lockerId: defaultLockerId ?? '',
         issueType: '',
         severity: 'MEDIUM',
         title: '',
@@ -49,6 +51,13 @@ export function CreateIssueModal({ onClose, onSuccess }: CreateIssueModalProps) 
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setFormData((prev) => ({
+            ...prev,
+            lockerId: defaultLockerId ?? '',
+        }));
+    }, [defaultLockerId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -123,7 +132,9 @@ export function CreateIssueModal({ onClose, onSuccess }: CreateIssueModalProps) 
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                             />
                             <p className="mt-1 text-xs text-gray-500">
-                                Enter the UUID of the affected locker
+                                {lockerCode
+                                    ? `Reporting issue for ${lockerCode}. Update the locker ID if you need a different locker.`
+                                    : 'Enter the UUID of the affected locker'}
                             </p>
                         </div>
 
