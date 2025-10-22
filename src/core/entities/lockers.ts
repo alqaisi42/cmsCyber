@@ -144,21 +144,48 @@ export interface LockerReservationRequest {
     userScope?: 'SPECIFIC_USER' | 'ALL_USERS';
 }
 
-export interface LockerIssueSummary {
+export type LockerIssueStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+
+export interface LockerIssueStatusHistoryEntry {
+    status: LockerIssueStatus;
+    changedBy: string;
+    changedAt: string;
+    notes?: string | null;
+}
+
+export interface LockerIssue {
     id: string;
     lockerId: string;
     lockerCode: string;
     issueType: string;
     severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+    status: LockerIssueStatus;
     title: string;
     description: string;
     reportedBy: string;
     reportedAt: string;
     assignedTo?: string | null;
     estimatedResolutionTime?: string | null;
+    resolvedAt?: string | null;
+    resolutionNotes?: string | null;
     attachments?: string[];
     commentsCount?: number;
+    statusHistory?: LockerIssueStatusHistoryEntry[];
+}
+
+export interface UpdateLockerIssuePayload {
+    status?: LockerIssueStatus;
+    assignedTo?: string | null;
+    notes?: string | null;
+    estimatedResolutionTime?: string | null;
+}
+
+export interface ResolveLockerIssuePayload {
+    resolutionNotes: string;
+    partsReplaced?: string[];
+    laborHours?: number;
+    totalCost?: number;
+    makeLockerAvailable?: boolean;
 }
 
 export interface LockerMaintenanceSummary {
@@ -172,6 +199,27 @@ export interface LockerMaintenanceSummary {
     notes?: string;
     completedAt?: string;
     totalCost?: number;
+}
+
+export interface LockerMaintenanceRecord {
+    id: string;
+    lockerId: string;
+    maintenanceType: 'PREVENTIVE' | 'CORRECTIVE' | 'EMERGENCY';
+    status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    scheduledDate: string;
+    completedAt?: string | null;
+    estimatedDurationHours: number;
+    actualDurationHours?: number | null;
+    assignedTo: string;
+    tasks?: string[];
+    completedTasks?: string[];
+    findings?: string | null;
+    partsUsed?: string[];
+    laborHours?: number | null;
+    totalCost?: number | null;
+    nextMaintenanceDue?: string | null;
+    notes?: string | null;
+    createdAt: string;
 }
 
 export interface LockerLocationWithLockers {

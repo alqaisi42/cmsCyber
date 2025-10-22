@@ -2,45 +2,30 @@
 
 <a id="locker-support-playbook"></a>
 
-The **Support & Incident Response** tab inside the locker management dashboard centralises every workflow described in the CMS locker subscription integration guide.
+The **Support & Incident Response** tab now presents a kanban-style workspace that sits directly on top of the production admin locker APIs. Every drag, drop, or detail update is routed through the same endpoints documented for the CMS, with toast notifications giving instant confirmation or warnings whenever a request fails.
 
 ## Navigation & Access
-- Use the new **Locker Support** item in the navigation drawer to open the dashboard directly in the Support tab.
-- The dashboard can also be reached from `/dashboard/lockers` by switching to the "Support & Issues" tab.
-- All actions surface non-blocking toast notifications for success, warning, or error outcomes so agents receive immediate feedback.
+- Open **Support & Issues** from the left navigation or visit `/dashboard/locker-support` to jump straight into the workspace.
+- The board automatically loads lockers that are flagged `OUT_OF_SERVICE`; use the dropdown to switch to any impacted locker.
+- All mutations call the live admin locker APIs and raise success, warning, or error toasts so the operator always knows the server outcome.
 
-## Live Incident Queue
-- Filter tickets by **status** or **priority** to focus on the right subset of work.
-- Update ticket status or assignment without leaving the list—changes are optimistically applied and synced once the API responds.
-- Timeline excerpts help agents reference acknowledgements, escalations, and resolution notes directly next to the ticket context.
+## Workspace Overview
+- **Kanban board** – Incidents are grouped into **Open**, **In progress**, **Resolved**, and **Closed** columns. Drag cards between columns to update their status through `PATCH /api/v1/admin/lockers/issues/{issueId}`.
+- **Issue detail panel** – Selecting a card surfaces assignment, ETA, and notes controls. Saving posts the new values back to the issue update endpoint.
+- **Resolve action** – Use the “Resolve & reopen locker” button to call `POST /api/v1/admin/lockers/issues/{issueId}/resolve` with your resolution notes. Successful responses trigger a toast and refresh the column data.
+- **Maintenance context** – The right-hand rail shows `GET /api/v1/admin/lockers/{lockerId}/maintenance/history` results so technicians can review the last intervention before scheduling new work.
+- **API reference** – The panel lists every endpoint used by the workspace (including `GET /api/v1/admin/lockers?status=OUT_OF_SERVICE` and `GET /api/v1/admin/lockers/{lockerId}/issues`) so administrators know exactly which backend flows are in play.
 
-## Task Runway
-- View all operational tasks in one board with quick filters for *Due today*, *Overdue*, or *Completed*.
-- Change task status, snooze due dates, or log brand new follow-up items. Every mutation raises a toast to confirm the outcome.
-- Link a task back to a ticket so engineering, operations, and support stay aligned on the same escalation.
+## Reset & Error Handling
+- Use **Reset & reload API data** whenever you need to discard local drag-and-drop ordering and fetch a fresh snapshot from the server.
+- If an API returns an error, the board automatically reverts the affected card and surfaces an error toast with the server message.
+- When the API is unreachable, the workspace stops issuing optimistic updates, keeping the UI in sync with confirmed server state.
 
-## Location Issue Digest
-- Scan a digest of locker locations with active issues, escalations, and trend direction.
-- Use this digest to align preventive maintenance with the availability, usage, and subscription data documented in the API implementation guide.
+## Daily Operational Checklist
+1. Refresh the locker list to confirm today’s out-of-service scope.
+2. Drag urgent incidents (HIGH or CRITICAL) into **In progress** and assign a technician with an ETA.
+3. Review the maintenance history to coordinate any dependencies or spare parts.
+4. Once work is verified on-site, resolve the issue so the locker becomes available again.
+5. Keep an eye on toasts—warnings indicate a retry is required, while successes confirm the backend accepted the change.
 
-## Next-Action Radar
-- Highlight the next ticket breaching its SLA with a single-click "Acknowledge" shortcut.
-- This emphasises the flows in the API guide around escalation, invitation management, and conflict resolution.
-
-## Toast Feedback Matrix
-| Scenario | Toast Type | Example Message |
-| --- | --- | --- |
-| Ticket status change succeeds | Success | "Ticket updated" |
-| Assignment stored offline | Warning | "Assignment pending sync" |
-| API unreachable | Error | "Unable to load locker support" |
-| Availability fallback data | Warning | "Support insights limited" |
-| Task created | Success | "Task created" |
-
-## Operational Checklist
-1. Refresh the Support tab at the start of each shift (button in the header).
-2. Filter down to **High** or **Critical** incidents first and assign an owner.
-3. Acknowledge tickets with upcoming `nextActionDueAt` timestamps.
-4. Use the task runway to ensure every escalated ticket has a follow-up task and owner.
-5. Review the location digest to proactively inform subscription owners or maintenance crews.
-
-Keeping these steps aligned with the comprehensive API flow ensures the CMS delivers a reliable locker experience for admins, owners, and shared users alike.
+Staying aligned with these API-driven workflows ensures the CMS delivers a reliable experience for admins, owners, and field teams.
