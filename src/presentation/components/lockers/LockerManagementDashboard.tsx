@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     AccessibleSubscription,
     CreateSubscriptionRequest,
@@ -29,7 +29,9 @@ import {
     CheckCircle2,
     Clock,
     CreditCard,
+    Info,
     Layers,
+    LifeBuoy,
     Loader2,
     Lock,
     MapPin,
@@ -38,10 +40,10 @@ import {
     ShieldCheck,
     Users,
     X,
-    Info,
 } from 'lucide-react';
 import { useToast } from '@/presentation/components/ui/toast';
 import { cn } from '../../../shared/utils/cn';
+import SupportIssuesWorkspace from './support/SupportIssuesWorkspace';
 
 const tabs = [
     { id: 'overview', label: 'Overview', icon: Layers },
@@ -50,6 +52,7 @@ const tabs = [
     { id: 'locations', label: 'Locations', icon: MapPin },
     { id: 'lockers', label: 'Lockers & Availability', icon: Lock },
     { id: 'reservations', label: 'Reservations', icon: CalendarCheck },
+    { id: 'support', label: 'Support & Issues', icon: LifeBuoy },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['id'];
@@ -166,6 +169,36 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     const [calendarDetails, setCalendarDetails] = useState<Record<string, FamilyCalendarResponse>>({});
     const [calendarLoading, setCalendarLoading] = useState(false);
 
+    const fetchPlans = useCallback(async () => {
+        setPlansLoading(true);
+        try {
+            const response = await lockerSubscriptionService.getPlans();
+            setPlans(response.data);
+            setPlansMessage(response.message || null);
+
+            if (response.errors?.includes('FALLBACK_DATA')) {
+                pushToast({
+                    type: 'warning',
+                    title: 'Showing fallback plans',
+                    description:
+                        response.message || 'Using cached locker plans while the API is unreachable.',
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load plans:', error);
+            const description =
+                error instanceof Error ? error.message : 'Unexpected error retrieving plans.';
+            setPlansMessage('Unable to load subscription plans.');
+            pushToast({
+                type: 'error',
+                title: 'Failed to load plans',
+                description,
+            });
+        } finally {
+            setPlansLoading(false);
+        }
+    }, [pushToast]);
+
     useEffect(() => {
         setActiveTab(defaultTab);
     }, [defaultTab]);
@@ -193,32 +226,6 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
     }, [selectedLocationId]);
 
     useEffect(() => {
-        const loadPlans = async () => {
-            setPlansLoading(true);
-            try {
-                const response = await lockerSubscriptionService.getPlans();
-                setPlans(response.data);
-                setPlansMessage(response.message || null);
-                if (response.errors?.includes('FALLBACK_DATA')) {
-                    pushToast({
-                        type: 'warning',
-                        title: 'Showing fallback plans',
-                        description: response.message || 'Using cached locker plans while the API is unreachable.',
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load plans:', error);
-                setPlansMessage('Unable to load subscription plans.');
-                pushToast({
-                    type: 'error',
-                    title: 'Failed to load plans',
-                    description: error instanceof Error ? error.message : 'Unexpected error retrieving plans.',
-                });
-            } finally {
-                setPlansLoading(false);
-            }
-        };
-
         const loadLocations = async () => {
             setLocationsLoading(true);
             try {
@@ -283,10 +290,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             }
         };
 
-        loadPlans();
+        fetchPlans();
         loadLocations();
         loadLocationHierarchy();
-    }, [pushToast, token]);
+    }, [fetchPlans, pushToast, token]);
 
     useEffect(() => {
         if (!token || !selectedUserId) {
@@ -893,6 +900,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
         </div>
     );
 
+    const renderSupport = () => <SupportIssuesWorkspace token={token ?? undefined} />;
+
     const renderOverview = () => (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -947,7 +956,8 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             </div>
                         )}
                         {activePlans.slice(0, 3).map((subscription) => {
-                            const usedLockers = subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
+                            const usedLockers =
+                                subscription.currentUsage.totalCapacity - subscription.currentUsage.availableCapacity;
                             const billingLabel = subscription.billingCycle === 'ANNUAL' ? 'Annual' : 'Monthly';
                             return (
                                 <div key={subscription.id} className="border border-gray-100 rounded-lg p-4">
@@ -967,11 +977,15 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                                         </div>
                                         <div>
                                             <p className="text-gray-400">Usage</p>
-                                            <p className="font-semibold text-gray-700">{usedLockers}/{subscription.currentUsage.totalCapacity} lockers</p>
+                                            <p className="font-semibold text-gray-700">
+                                                {usedLockers}/{subscription.currentUsage.totalCapacity} lockers
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-gray-400">Active until</p>
-                                            <p className="font-semibold text-gray-700">{new Date(subscription.endDate).toLocaleDateString()}</p>
+                                            <p className="font-semibold text-gray-700">
+                                                {new Date(subscription.endDate).toLocaleDateString()}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -1017,18 +1031,66 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                     </div>
                 </div>
             </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <span className="p-3 rounded-xl bg-blue-50 text-blue-600">
+                            <LifeBuoy className="w-5 h-5" />
+                        </span>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Support & Issues workspace</h3>
+                            <p className="text-sm text-gray-500">
+                                Review incidents, drag issues across swimlanes, and trigger toasts for success or recovery states.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        onClick={() => setActiveTab('support')}
+                    >
+                        Open workspace
+                        <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500">
+                    <div className="border border-blue-100 rounded-lg p-4 bg-blue-50/40">
+                        <p className="font-semibold text-gray-800">Kanban control</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Drag locker issues between statuses to mirror live API updates without leaving the dashboard.
+                        </p>
+                    </div>
+                    <div className="border border-emerald-100 rounded-lg p-4 bg-emerald-50/40">
+                        <p className="font-semibold text-gray-800">Maintenance context</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Preview latest maintenance records and usage impact while resolving incidents.
+                        </p>
+                    </div>
+                    <div className="border border-amber-100 rounded-lg p-4 bg-amber-50/40">
+                        <p className="font-semibold text-gray-800">Toast feedback</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Every action surfaces success or recovery toasts so admins stay confident in their updates.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 
     const renderPlans = () => (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-900">Subscription Plans</h2>
                     <p className="text-gray-500">Compare available locker subscriptions and their benefits.</p>
                 </div>
-                <button onClick={() => setPlansMessage('Plans refreshed.')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
-                    <RefreshCw className="w-4 h-4" /> Refresh
+                <button
+                    onClick={() => fetchPlans()}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm"
+                    disabled={plansLoading}
+                >
+                    {plansLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Refresh
                 </button>
             </div>
             {plansMessage && (
@@ -1038,10 +1100,13 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                 <div className="flex justify-center items-center h-40">
                     <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                 </div>
-            ) : (
+            ) : plans.length ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {plans.map((plan) => (
-                        <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden">
+                        <div
+                            key={plan.id}
+                            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 relative overflow-hidden"
+                        >
                             <div className="absolute right-6 top-6">
                                 <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
                                     {plan.sharingEnabled ? 'Sharing enabled' : 'Sharing disabled'}
@@ -1080,6 +1145,10 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
                             </ul>
                         </div>
                     ))}
+                </div>
+            ) : (
+                <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-500">
+                    No plans available at the moment.
                 </div>
             )}
         </div>
@@ -2161,6 +2230,7 @@ export function LockerManagementDashboard({ defaultTab = 'overview' }: LockerMan
             {activeTab === 'locations' && renderLocationsManagement()}
             {activeTab === 'lockers' && renderLockers()}
             {activeTab === 'reservations' && renderReservations()}
+            {activeTab === 'support' && renderSupport()}
         </div>
     );
 }

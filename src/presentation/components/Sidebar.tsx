@@ -17,7 +17,8 @@ import {
     Menu,
     X,
     Tag,
-    CreditCard
+    CreditCard,
+    LifeBuoy,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from "../../shared/utils/cn";
@@ -79,6 +80,11 @@ const navigationItems = [
         title: 'Locker Subscriptions',
         href: '/dashboard/locker-subscriptions',
         icon: CreditCard,
+    },
+    {
+        title: 'Locker Support',
+        href: '/dashboard/locker-support',
+        icon: LifeBuoy,
     },
     {
         title: 'Settings',
