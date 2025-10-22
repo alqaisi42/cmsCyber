@@ -10,7 +10,7 @@ import {
     ResolveLockerIssuePayload,
     LockerStatus,
     LockerSize,
-    LockerIssueStatus,
+    LockerIssueStatus, LockerDetails,
 } from '../../core/entities/lockers';
 import {
     ApiResponse,
@@ -31,7 +31,7 @@ export interface LockerListFilters {
     isActive?: boolean;
     maintenanceStatus?: 'OPERATIONAL' | 'REQUIRES_MAINTENANCE' | 'UNDER_MAINTENANCE';
     page?: number;
-    size?: number;
+    pageSize?: number;
     sort?: string;
 }
 
@@ -311,18 +311,18 @@ export class LockerAdminRepository {
     /**
      * Get locker statistics
      */
-    async getLockerStats(): Promise<{
-        totalLockers: number;
-        availableLockers: number;
-        occupiedLockers: number;
-        maintenanceLockers: number;
-        outOfServiceLockers: number;
-        utilizationRate: number;
-        averageOccupancyHours: number;
-    }> {
-        const response = await apiClient.get(`${this.baseUrl}/stats`);
-        return response.data;
-    }
+    // async getLockerStats(): Promise<{
+    //     totalLockers: number;
+    //     availableLockers: number;
+    //     occupiedLockers: number;
+    //     maintenanceLockers: number;
+    //     outOfServiceLockers: number;
+    //     utilizationRate: number;
+    //     averageOccupancyHours: number;
+    // }> {
+    //     const response = await apiClient.get(`${this.baseUrl}/stats`);
+    //     return response.data;
+    // }
 }
 
 // Export singleton instance

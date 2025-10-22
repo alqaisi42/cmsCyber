@@ -1,453 +1,391 @@
 // src/presentation/components/lockers/LockerSupportWorkspace.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
+import {DragDropContext, Droppable, Draggable, DropResult} from '@hello-pangea/dnd';
 import {
     AlertCircle,
-    RefreshCw,
+    Clock,
+    CheckCircle,
+    XCircle,
+    ChevronRight,
+    User,
+    Calendar,
+    AlertTriangle,
+    Wrench,
+    Settings as Tool,
+    Package,
+    MapPin,
+    Activity,
     Filter,
     Search,
     Plus,
-    BarChart3,
-    Clock,
-    CheckCircle,
-    X as CloseIcon,
+    RefreshCw,
+    Settings,
 } from 'lucide-react';
-import { LockerIssue, LockerIssueStatus } from '@/core/entities';
-import { IssueKanbanBoard } from './IssueKanbanBoard';
-import { IssueDetailPanel } from './IssueDetailPanel';
-
-import { cn } from '@/shared/utils/cn';
-import MaintenanceHistoryPanel from "@/presentation/components/lockers/MaintenanceHistoryPanel";
-import CreateIssueModal from "@/presentation/components/lockers/CreateIssueModal";
+import {
+    LockerSummary,
+    LockerIssue,
+    LockerMaintenanceRecord,
+    LockerIssueStatus,
+} from '../../../core/entities/lockers';
+import {lockerAdminRepository} from '../../../infrastructure/repositories/locker-admin.repository';
+import {cn} from '../../../shared/utils/cn';
+import IssueKanbanBoard, {IssueSeverity} from './IssueKanbanBoard';
+import MaintenanceHistoryPanel from './MaintenanceHistoryPanel';
+import {useToast} from "@/presentation/components/ui/toast";
+import {useAllOpenIssues, useMaintenanceHistory} from "@/presentation/hooks/useLockerSupport";
 
 // ==========================================
 // TYPES
 // ==========================================
 
-interface ToastMessage {
-    id: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    title: string;
-    message: string;
+interface LockerSupportWorkspaceProps {
+    token?: string;
+}
+
+interface FilterState {
+    severity: IssueSeverity | 'ALL';
+    location: string;
+    search: string;
 }
 
 // ==========================================
-// COMPONENT
+// MAIN COMPONENT
 // ==========================================
 
-export function LockerSupportWorkspace() {
+export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
+    const {pushToast} = useToast();
+    const {issues: allOpenIssues, loading: loadingIssues, refresh: refreshIssues} = useAllOpenIssues();
+    const {history: maintenanceHistory, loading: loadingMaintenance, loadMaintenanceHistory} = useMaintenanceHistory();
+
     // State
-    const [selectedIssue, setSelectedIssue] = useState<LockerIssue | null>(null);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [toasts, setToasts] = useState<ToastMessage[]>([]);
-    const [filterStatus, setFilterStatus] = useState<LockerIssueStatus | 'ALL'>('ALL');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showMaintenancePanel, setShowMaintenancePanel] = useState(false);
+    const [lockers, setLockers] = useState<LockerSummary[]>([]);
     const [selectedLockerId, setSelectedLockerId] = useState<string | null>(null);
-
-    // Hooks
-    const { issues, loading, error, refetch, updateIssue, resolveIssue } = useAllOpenIssues();
-    const { records: maintenanceRecords, refetch: refetchMaintenance } =
-        useMaintenanceHistory(selectedLockerId);
-
-    // Filter issues
-    const filteredIssues = issues.filter((issue) => {
-        const matchesStatus = filterStatus === 'ALL' || issue.status === filterStatus;
-        const matchesSearch =
-            !searchQuery ||
-            issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            issue.lockerCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            issue.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-        return matchesStatus && matchesSearch;
+    const [filteredIssues, setFilteredIssues] = useState<LockerIssue[]>([]);
+    const [filters, setFilters] = useState<FilterState>({
+        severity: 'ALL',
+        location: '',
+        search: '',
     });
+    const [showMaintenancePanel, setShowMaintenancePanel] = useState(false);
+    const [loadingLockers, setLoadingLockers] = useState(false);
+    const [updatingIssue, setUpdatingIssue] = useState(false);
 
-    // Toast helpers
-    const showToast = (type: ToastMessage['type'], title: string, message: string) => {
-        const id = Math.random().toString(36).substr(2, 9);
-        setToasts((prev) => [...prev, { id, type, title, message }]);
+    // Load lockers with issues
+    const loadLockersWithIssues = useCallback(async () => {
+        setLoadingLockers(true);
+        try {
+            const response = await lockerAdminRepository.getAllLockers({
+                maintenanceStatus: 'REQUIRES_MAINTENANCE',
+                page: 0,
+                pageSize: 100,
+            });
+            setLockers(response.data);
 
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 5000);
+            // Auto-select first locker if available
+            if (response.data.length > 0 && !selectedLockerId) {
+                setSelectedLockerId(response.data[0].id);
+            }
+        } catch (error) {
+            console.error('Failed to load lockers:', error);
+            pushToast({
+                type: 'error',
+                title: 'Error',
+                description: 'Failed to load lockers',
+            });
+        } finally {
+            setLoadingLockers(false);
+        }
+    }, [selectedLockerId, pushToast]);
+
+    // Filter issues based on selected locker and filters
+    useEffect(() => {
+        let filtered = [...allOpenIssues];
+
+        // Filter by selected locker
+        if (selectedLockerId) {
+            filtered = filtered.filter(issue => issue.lockerId === selectedLockerId);
+        }
+
+        // Filter by severity
+        if (filters.severity !== 'ALL') {
+            filtered = filtered.filter(issue => issue.severity === filters.severity);
+        }
+
+        // Filter by search
+        if (filters.search) {
+            const searchLower = filters.search.toLowerCase();
+            filtered = filtered.filter(issue =>
+                issue.title.toLowerCase().includes(searchLower) ||
+                issue.description.toLowerCase().includes(searchLower) ||
+                issue.lockerCode.toLowerCase().includes(searchLower)
+            );
+        }
+
+        setFilteredIssues(filtered);
+    }, [allOpenIssues, selectedLockerId, filters]);
+
+    // Handle issue status change
+    const handleIssueStatusChange = async (issueId: string, newStatus: LockerIssueStatus) => {
+        setUpdatingIssue(true);
+        try {
+            await lockerAdminRepository.updateIssue(issueId, {status: newStatus});
+
+            pushToast({
+                type: 'success',
+                title: 'Success',
+                description: 'Issue status updated successfully',
+            });
+
+            // Refresh issues
+            await refreshIssues();
+        } catch (error) {
+            console.error('Failed to update issue:', error);
+            pushToast({
+                type: 'error',
+                title: 'Error',
+                description: 'Failed to update issue status',
+            });
+        } finally {
+            setUpdatingIssue(false);
+        }
     };
 
-    const removeToast = (id: string) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-    };
-
-    // Event handlers
+    // Handle issue click
     const handleIssueClick = (issue: LockerIssue) => {
-        setSelectedIssue(issue);
+        // Open issue detail panel or modal
+        console.log('Issue clicked:', issue);
+        // TODO: Implement issue detail view
     };
 
-    const handleStatusChange = async (issueId: string, newStatus: LockerIssueStatus) => {
-        try {
-            await updateIssue(issueId, { status: newStatus });
-            showToast('success', 'Status Updated', 'Issue status has been updated successfully');
-        } catch (error: any) {
-            showToast('error', 'Update Failed', error.message || 'Failed to update issue status');
-            throw error; // Re-throw to trigger rollback in Kanban board
+    // Load maintenance history when locker is selected
+    useEffect(() => {
+        if (selectedLockerId) {
+            loadMaintenanceHistory(selectedLockerId);
         }
-    };
+    }, [selectedLockerId, loadMaintenanceHistory]);
 
-    const handleUpdateIssue = async (issueId: string, data: any) => {
-        try {
-            await updateIssue(issueId, data);
-            showToast('success', 'Issue Updated', 'Issue has been updated successfully');
-            await refetch();
-        } catch (error: any) {
-            showToast('error', 'Update Failed', error.message || 'Failed to update issue');
-            throw error;
-        }
-    };
-
-    const handleResolveIssue = async (issueId: string, data: any) => {
-        try {
-            await resolveIssue(issueId, data);
-            showToast('success', 'Issue Resolved', 'Issue has been resolved and locker is now available');
-            await refetch();
-        } catch (error: any) {
-            showToast('error', 'Resolution Failed', error.message || 'Failed to resolve issue');
-            throw error;
-        }
-    };
-
-    const handleRefresh = async () => {
-        try {
-            await refetch();
-            showToast('success', 'Data Refreshed', 'Issue data has been reloaded from the server');
-        } catch (error: any) {
-            showToast('error', 'Refresh Failed', error.message || 'Failed to refresh data');
-        }
-    };
-
-    const handleViewMaintenance = (lockerId: string) => {
-        setSelectedLockerId(lockerId);
-        setShowMaintenancePanel(true);
-        refetchMaintenance();
-    };
-
-    // Calculate stats
-    const stats = {
-        total: filteredIssues.length,
-        open: filteredIssues.filter((i) => i.status === 'OPEN').length,
-        inProgress: filteredIssues.filter((i) => i.status === 'IN_PROGRESS').length,
-        resolved: filteredIssues.filter((i) => i.status === 'RESOLVED').length,
-        critical: filteredIssues.filter((i) => i.severity === 'CRITICAL').length,
-    };
+    // Initial load
+    useEffect(() => {
+        loadLockersWithIssues();
+    }, []);
 
     return (
-        <div className="space-y-6">
+        <div className="h-full flex flex-col bg-gray-50">
             {/* Header */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                            <AlertCircle className="w-8 h-8 text-blue-600" />
-                            Locker Support & Incident Response
-                        </h1>
-                        <p className="text-gray-500 mt-1">
-                            Kanban-style workspace for managing locker issues and maintenance
-                        </p>
+            <div className="bg-white border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-2xl font-bold text-gray-900">Locker Support Center</h1>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+                            {filteredIssues.length} Active Issues
+                        </span>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={handleRefresh}
-                            disabled={loading}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                            onClick={() => refreshIssues()}
+                            disabled={loadingIssues}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                         >
-                            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+                            <RefreshCw className={cn('w-4 h-4', loadingIssues && 'animate-spin')}/>
                             Refresh
                         </button>
                         <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        >
-                            <Plus className="w-4 h-4" />
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                            <Plus className="w-4 h-4"/>
                             Report Issue
                         </button>
                     </div>
                 </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-                    <StatCard
-                        label="Total Issues"
-                        value={stats.total}
-                        icon={<BarChart3 className="w-5 h-5" />}
-                        color="blue"
-                    />
-                    <StatCard
-                        label="Open"
-                        value={stats.open}
-                        icon={<AlertCircle className="w-5 h-5" />}
-                        color="red"
-                    />
-                    <StatCard
-                        label="In Progress"
-                        value={stats.inProgress}
-                        icon={<Clock className="w-5 h-5" />}
-                        color="yellow"
-                    />
-                    <StatCard
-                        label="Resolved"
-                        value={stats.resolved}
-                        icon={<CheckCircle className="w-5 h-5" />}
-                        color="green"
-                    />
-                    <StatCard
-                        label="Critical"
-                        value={stats.critical}
-                        icon={<AlertCircle className="w-5 h-5 animate-pulse" />}
-                        color="red"
-                        highlight
-                    />
-                </div>
             </div>
 
-            {/* Filters & Search */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
-                <div className="flex flex-col md:flex-row gap-4">
+            {/* Filters Bar */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3">
+                <div className="flex items-center gap-4">
                     {/* Search */}
                     <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"/>
                         <input
                             type="text"
-                            placeholder="Search issues by title, locker code, or description..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Search issues..."
+                            value={filters.search}
+                            onChange={(e) => setFilters(prev => ({...prev, search: e.target.value}))}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
-                    {/* Status Filter */}
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-5 h-5 text-gray-400" />
-                        <select
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value as any)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                            <option value="ALL">All Statuses</option>
-                            <option value="OPEN">Open</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="RESOLVED">Resolved</option>
-                            <option value="CLOSED">Closed</option>
-                        </select>
+                    {/* Severity Filter */}
+                    <select
+                        value={filters.severity}
+                        onChange={(e) => setFilters(prev => ({...prev, severity: e.target.value as any}))}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="ALL">All Severities</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="LOW">Low</option>
+                    </select>
+
+                    {/* Locker Filter */}
+                    <select
+                        value={selectedLockerId || ''}
+                        onChange={(e) => setSelectedLockerId(e.target.value || null)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">All Lockers</option>
+                        {lockers.map(locker => (
+                            <option key={locker.id} value={locker.id}>
+                                {locker.code} - {locker.locationName}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar - Locker List */}
+                <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+                    <div className="p-4">
+                        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
+                            Lockers with Issues
+                        </h2>
+                        {loadingLockers ? (
+                            <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        ) : lockers.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300"/>
+                                <p className="text-sm">No lockers with issues</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {lockers.map(locker => {
+                                    const lockerIssues = allOpenIssues.filter(i => i.lockerId === locker.id);
+                                    const criticalCount = lockerIssues.filter(i => i.severity === 'CRITICAL').length;
+
+                                    return (
+                                        <button
+                                            key={locker.id}
+                                            onClick={() => setSelectedLockerId(locker.id)}
+                                            className={cn(
+                                                'w-full text-left p-3 rounded-lg border-2 transition-all',
+                                                selectedLockerId === locker.id
+                                                    ? 'bg-blue-50 border-blue-500'
+                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                            )}
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div>
+                                                    <h3 className="font-semibold text-gray-900">{locker.code}</h3>
+                                                    <p className="text-sm text-gray-600">{locker.locationName}</p>
+                                                </div>
+                                                {criticalCount > 0 && (
+                                                    <span
+                                                        className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+                                                        {criticalCount} Critical
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3"/>
+                                                    {locker.locationName}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <AlertCircle className="w-3 h-3"/>
+                                                    {lockerIssues.length} issues
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="p-4 border-t border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
+                            Quick Stats
+                        </h3>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Critical Issues</span>
+                                <span className="text-sm font-semibold text-red-600">
+                                    {allOpenIssues.filter(i => i.severity === 'CRITICAL').length}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">In Progress</span>
+                                <span className="text-sm font-semibold text-blue-600">
+                                    {allOpenIssues.filter(i => i.status === 'IN_PROGRESS').length}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Pending</span>
+                                <span className="text-sm font-semibold text-yellow-600">
+                                    {allOpenIssues.filter(i => i.status === 'OPEN').length}
+                                </span>
+                            </div>
+                        </div>
+
+                        {selectedLockerId && (
+                            <button
+                                onClick={() => setShowMaintenancePanel(true)}
+                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+                            >
+                                <Wrench className="w-4 h-4"/>
+                                View Maintenance History
+                            </button>
+                        )}
                     </div>
                 </div>
-            </div>
 
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                        <h3 className="font-medium text-red-900">Error Loading Issues</h3>
-                        <p className="text-sm text-red-700 mt-1">{error}</p>
-                    </div>
-                </div>
-            )}
-
-            {/* Kanban Board */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-                <IssueKanbanBoard
-                    issues={filteredIssues}
-                    onIssueClick={handleIssueClick}
-                    onStatusChange={handleStatusChange}
-                    loading={loading}
-                />
-            </div>
-
-            {/* API Reference Panel */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-blue-600" />
-                    Active API Endpoints
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                    <ApiEndpointCard
-                        method="GET"
-                        endpoint="/api/v1/admin/lockers?status=OUT_OF_SERVICE"
-                        description="Load impacted lockers"
-                    />
-                    <ApiEndpointCard
-                        method="GET"
-                        endpoint="/api/v1/admin/lockers/{lockerId}/issues"
-                        description="Fetch locker issues"
-                    />
-                    <ApiEndpointCard
-                        method="PATCH"
-                        endpoint="/api/v1/admin/lockers/issues/{issueId}"
-                        description="Update issue status"
-                    />
-                    <ApiEndpointCard
-                        method="POST"
-                        endpoint="/api/v1/admin/lockers/issues/{issueId}/resolve"
-                        description="Resolve issue"
-                    />
-                    <ApiEndpointCard
-                        method="GET"
-                        endpoint="/api/v1/admin/lockers/{lockerId}/maintenance/history"
-                        description="Maintenance records"
-                    />
-                    <ApiEndpointCard
-                        method="GET"
-                        endpoint="/api/v1/admin/lockers/issues"
-                        description="All open issues"
-                    />
+                {/* Main Content - Kanban Board */}
+                <div className="flex-1 p-6 overflow-auto">
+                    {loadingIssues ? (
+                        <div className="flex items-center justify-center h-full">
+                            <div className="text-center">
+                                <div
+                                    className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                <p className="text-gray-500">Loading issues...</p>
+                            </div>
+                        </div>
+                    ) : filteredIssues.length === 0 ? (
+                        <div className="flex items-center justify-center h-full">
+                            <div className="text-center">
+                                <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Issues Found</h3>
+                                <p className="text-gray-500">
+                                    {selectedLockerId
+                                        ? 'This locker has no active issues'
+                                        : 'Select a locker to view its issues'}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <IssueKanbanBoard
+                            issues={filteredIssues}
+                            onIssueClick={handleIssueClick}
+                            onStatusChange={handleIssueStatusChange}
+                            loading={updatingIssue}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* Modals & Panels */}
-            {selectedIssue && (
-                <IssueDetailPanel
-                    issue={selectedIssue}
-                    onClose={() => setSelectedIssue(null)}
-                    onUpdate={handleUpdateIssue}
-                    onResolve={handleResolveIssue}
-                />
-            )}
-
-            {showCreateModal && (
-                <CreateIssueModal
-                    onClose={() => setShowCreateModal(false)}
-                    onSuccess={() => {
-                        setShowCreateModal(false);
-                        refetch();
-                        showToast('success', 'Issue Created', 'New issue has been reported successfully');
-                    }}
-                />
-            )}
-
+            {/* Maintenance History Panel */}
             {showMaintenancePanel && selectedLockerId && (
                 <MaintenanceHistoryPanel
                     lockerId={selectedLockerId}
-                    records={maintenanceRecords}
-                    onClose={() => {
-                        setShowMaintenancePanel(false);
-                        setSelectedLockerId(null);
-                    }}
+                    records={maintenanceHistory}
+                    onClose={() => setShowMaintenancePanel(false)}
                 />
             )}
-
-            {/* Toast Notifications */}
-            <ToastContainer toasts={toasts} onRemove={removeToast} />
-        </div>
-    );
-}
-
-// ==========================================
-// SUB-COMPONENTS
-// ==========================================
-
-interface StatCardProps {
-    label: string;
-    value: number;
-    icon: React.ReactNode;
-    color: 'blue' | 'red' | 'yellow' | 'green';
-    highlight?: boolean;
-}
-
-function StatCard({ label, value, icon, color, highlight }: StatCardProps) {
-    const colorClasses = {
-        blue: 'bg-blue-50 text-blue-600 border-blue-200',
-        red: 'bg-red-50 text-red-600 border-red-200',
-        yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
-        green: 'bg-green-50 text-green-600 border-green-200',
-    };
-
-    return (
-        <div
-            className={cn(
-                'rounded-lg p-4 border-2',
-                colorClasses[color],
-                highlight && 'ring-2 ring-red-400 ring-offset-2'
-            )}
-        >
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-medium opacity-80">{label}</p>
-                    <p className="text-2xl font-bold mt-1">{value}</p>
-                </div>
-                {icon}
-            </div>
-        </div>
-    );
-}
-
-interface ApiEndpointCardProps {
-    method: string;
-    endpoint: string;
-    description: string;
-}
-
-function ApiEndpointCard({ method, endpoint, description }: ApiEndpointCardProps) {
-    const methodColors = {
-        GET: 'bg-green-100 text-green-800',
-        POST: 'bg-blue-100 text-blue-800',
-        PATCH: 'bg-yellow-100 text-yellow-800',
-        PUT: 'bg-orange-100 text-orange-800',
-        DELETE: 'bg-red-100 text-red-800',
-    };
-
-    return (
-        <div className="bg-white rounded-lg p-3 border border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-                <span
-                    className={cn(
-                        'text-xs font-mono font-bold px-2 py-1 rounded',
-                        methodColors[method as keyof typeof methodColors]
-                    )}
-                >
-                    {method}
-                </span>
-            </div>
-            <p className="font-mono text-xs text-gray-700 mb-2 break-all">{endpoint}</p>
-            <p className="text-xs text-gray-600">{description}</p>
-        </div>
-    );
-}
-
-interface ToastContainerProps {
-    toasts: ToastMessage[];
-    onRemove: (id: string) => void;
-}
-
-function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-    if (toasts.length === 0) return null;
-
-    const toastColors = {
-        success: 'bg-green-600',
-        error: 'bg-red-600',
-        warning: 'bg-yellow-600',
-        info: 'bg-blue-600',
-    };
-
-    return (
-        <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-md">
-            {toasts.map((toast) => (
-                <div
-                    key={toast.id}
-                    className={cn(
-                        'rounded-lg shadow-lg p-4 text-white flex items-start gap-3 animate-slide-in-right',
-                        toastColors[toast.type]
-                    )}
-                >
-                    <div className="flex-1">
-                        <p className="font-semibold">{toast.title}</p>
-                        <p className="text-sm opacity-90 mt-1">{toast.message}</p>
-                    </div>
-                    <button
-                        onClick={() => onRemove(toast.id)}
-                        className="p-1 rounded hover:bg-white/20 transition-colors"
-                    >
-                        <CloseIcon className="w-4 h-4" />
-                    </button>
-                </div>
-            ))}
         </div>
     );
 }

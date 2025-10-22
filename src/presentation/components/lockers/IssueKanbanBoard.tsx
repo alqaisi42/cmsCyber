@@ -13,6 +13,7 @@ import {
     Calendar,
     AlertTriangle,
 } from 'lucide-react';
+// Import IssueSeverity along with other types
 import { LockerIssue, LockerIssueStatus } from '../../../core/entities/lockers';
 import { cn } from '../../../shared/utils/cn';
 
@@ -75,7 +76,8 @@ const COLUMNS: KanbanColumn[] = [
     },
 ];
 
-const SEVERITY_COLORS = {
+// Updated to use IssueSeverity type
+const SEVERITY_COLORS: Record<IssueSeverity, string> = {
     LOW: 'bg-green-100 text-green-800 border-green-200',
     MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     HIGH: 'bg-orange-100 text-orange-800 border-orange-200',
@@ -343,3 +345,4 @@ function IssueCard({
 }
 
 export default IssueKanbanBoard;
+export type IssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';

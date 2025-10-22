@@ -291,6 +291,16 @@ export interface FamilyCalendarTimeSlot {
     reservations: FamilyCalendarReservation[];
 }
 
+export interface LockerDetails extends LockerSummary {
+    description?: string;
+    features: string[];
+    accessCode?: string;
+    maintenanceHistory: LockerMaintenanceRecord[];
+    reservationHistory: LockerReservation[];
+    issues: LockerIssue[];
+    metadata: Record<string, any>;
+}
+
 export interface FamilyCalendarResponse {
     subscriptionId: string;
     timeSlots: FamilyCalendarTimeSlot[];

@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { X, Wrench, Calendar, Clock, DollarSign, CheckCircle, AlertCircle, Tool } from 'lucide-react';
+import { X, Wrench, Calendar, Clock, DollarSign, CheckCircle, AlertCircle,  Settings as Tool  } from 'lucide-react';
 import { LockerMaintenanceRecord } from '../../../core/entities/lockers';
 import { cn } from '../../../shared/utils/cn';
 
