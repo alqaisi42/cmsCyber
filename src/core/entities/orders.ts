@@ -51,14 +51,34 @@ export interface CheckoutValidationResult {
     cartSummary: OrderCartSummary | null;
 }
 
+export interface LockerAvailabilitySubscriptionInfo {
+    subscriptionId: string;
+    isOwner: boolean;
+    sharingType: string | null;
+    remainingCapacity: number;
+    totalCapacity: number;
+    activeReservations: number;
+}
+
+export interface LockerAvailabilityOption {
+    lockerId: string;
+    lockerCode: string;
+    lockerName: string;
+    size: string;
+    status: string;
+    locationName: string;
+    locationAddress: string;
+    distanceKm: number | null;
+    subscriptionId?: string | null;
+}
+
 export interface OrderLockerAvailabilityResult {
     isAvailable: boolean;
-    lockerId: string;
-    locationId: string;
-    deliveryTime: string;
-    lockerSize: string;
-    reason?: string | null;
-    alternativeSlots?: string[];
+    availableLockers: LockerAvailabilityOption[];
+    totalAvailable: number;
+    subscriptionInfo: LockerAvailabilitySubscriptionInfo | null;
+    unavailabilityReason: string | null;
+    suggestedActions: string[];
 }
 
 export interface CheckoutSummary {
@@ -357,9 +377,7 @@ export interface CheckoutValidationPayload {
 export interface LockerAvailabilityParams {
     userId: number;
     locationId: string;
-    lockerId: string;
-    deliveryTime: string;
-    requiredSize: string;
+    requiredSize?: string;
 }
 
 export interface CheckoutSummaryParams {
