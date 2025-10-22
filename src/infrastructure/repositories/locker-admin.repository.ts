@@ -84,7 +84,7 @@ export interface ScheduleMaintenanceRequest {
 // ==========================================
 
 export class LockerAdminRepository {
-    private readonly baseUrl = '/api/v1/admin/lockers';
+    private readonly baseUrl = '/admin/lockers';
 
     // ==========================================
     // LOCKER CRUD OPERATIONS
@@ -199,14 +199,15 @@ export class LockerAdminRepository {
     /**
      * Report a new issue
      */
-    async reportIssue(data: ReportLockerIssueRequest): Promise<LockerIssue> {
-        const { lockerId, ...issueData } = data;
+    async reportIssue(data: ReportLockerIssueRequest, userId: number): Promise<LockerIssue> {
         const response = await apiClient.post<ApiResponse<LockerIssue>>(
-            `${this.baseUrl}/${lockerId}/issues`,
-            issueData
+            `${this.baseUrl}/${data.lockerId}/issues?userId=${userId}`,
+            data
         );
         return response.data;
     }
+
+
 
     /**
      * Update an existing issue
@@ -240,10 +241,26 @@ export class LockerAdminRepository {
      * Get all open issues across all lockers
      */
     async getAllOpenIssues(): Promise<LockerIssue[]> {
-        const response = await apiClient.get<ApiResponse<LockerIssue[]>>(
-            `${this.baseUrl}/issues?status=OPEN,IN_PROGRESS`
-        );
-        return response.data;
+        try {
+            const response = await apiClient.get<ApiResponse<LockerIssue[]>>(
+                `${this.baseUrl}/issues`,
+                {
+                    // params: { status: 'OPEN,IN_PROGRESS' },
+                    headers: { Accept: 'application/json' },
+                }
+            );
+
+            // ✅ If backend returns an array directly
+            if (Array.isArray(response.data)) {
+                return response.data;
+            }
+
+            console.warn('Unexpected response format from getAllOpenIssues:', response.data);
+            return [];
+        } catch (error: any) {
+            console.error('Failed to fetch open issues:', error);
+            throw new Error(error?.message ?? 'Failed to fetch open issues');
+        }
     }
 
     // ==========================================

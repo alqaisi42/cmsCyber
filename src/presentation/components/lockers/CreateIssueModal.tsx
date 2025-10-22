@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { X, AlertCircle, Send } from 'lucide-react';
 import { lockerAdminRepository, ReportLockerIssueRequest } from '@/infrastructure/repositories/locker-admin.repository';
 import { cn } from '@/shared/utils/cn';
+import {useAuthStore} from "@/presentation/contexts/auth-store";
 
 // ==========================================
 // TYPES
@@ -18,15 +19,11 @@ interface CreateIssueModalProps {
 }
 
 const ISSUE_TYPES = [
-    'Hardware Malfunction',
-    'Lock Failure',
-    'Door Stuck',
-    'Sensor Error',
-    'Power Issue',
-    'Connectivity Problem',
-    'Physical Damage',
-    'Cleaning Required',
-    'Other',
+    'OTHER',
+    'HARDWARE_MALFUNCTION',
+    'CLEANING_REQUIRED',
+    'PHYSICAL_DAMAGE',
+    'SOFTWARE_ERROR'
 ];
 
 const SEVERITY_OPTIONS = [
@@ -65,9 +62,15 @@ export function CreateIssueModal({ onClose, onSuccess, defaultLockerId, lockerCo
         setIsSubmitting(true);
 
         try {
-            await lockerAdminRepository.reportIssue(formData);
+            const { user } = useAuthStore.getState();
+            const userId = Number(14);
+
+            if (!userId) throw new Error('User ID missing — please log in again.');
+
+            await lockerAdminRepository.reportIssue(formData, userId);
             onSuccess();
         } catch (err: any) {
+            console.error('Report issue failed:', err);
             setError(err.message || 'Failed to create issue');
         } finally {
             setIsSubmitting(false);

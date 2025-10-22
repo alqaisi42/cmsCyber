@@ -14,6 +14,7 @@ import {
     LockerIssueStatus,
 } from '../../core/entities/lockers';
 import {useToast} from "@/presentation/components/ui/toast";
+import {useAuthStore} from "@/presentation/contexts/auth-store";
 
 // ==========================================
 // MAIN HOOK - useLockerSupport
@@ -241,9 +242,15 @@ export function useLockerIssues(lockerId?: string) {
         reportedBy: string;
     }) => {
         try {
-            const newIssue = await lockerAdminRepository.reportIssue(data);
+            const { user } = useAuthStore.getState(); // ✅ get user from store
+            const userId = Number(user?.id);
 
-            // Add to local state
+            if (!userId) {
+                throw new Error('User not authenticated');
+            }
+
+            const newIssue = await lockerAdminRepository.reportIssue(data, userId);
+
             setIssues(prev => [...prev, newIssue]);
 
             pushToast({
@@ -254,6 +261,7 @@ export function useLockerIssues(lockerId?: string) {
 
             return newIssue;
         } catch (err) {
+            console.error('Failed to report issue:', err);
             pushToast({
                 type: 'error',
                 title: 'Error',

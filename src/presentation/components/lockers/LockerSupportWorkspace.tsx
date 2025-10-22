@@ -47,7 +47,10 @@ interface FilterState {
 
 export function LockerSupportWorkspace({token}: LockerSupportWorkspaceProps) {
     const {pushToast} = useToast();
+
     const {issues: allOpenIssues, loading: loadingIssues, refresh: refreshIssues} = useAllOpenIssues();
+    const issuesArray = Array.isArray(allOpenIssues) ? allOpenIssues : allOpenIssues ?? [];
+
     const {history: maintenanceHistory, loadMaintenanceHistory} = useMaintenanceHistory();
 
     // State
