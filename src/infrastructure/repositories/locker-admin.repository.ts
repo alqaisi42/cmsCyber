@@ -232,7 +232,7 @@ export class LockerAdminRepository {
     /**
      * Update an existing issue
      */
-    async updateIssue(
+        async updateIssue(
         issueId: string,
         data: UpdateLockerIssuePayload
     ): Promise<LockerIssue> {
