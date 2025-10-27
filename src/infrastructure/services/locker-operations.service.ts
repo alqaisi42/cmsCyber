@@ -24,26 +24,8 @@ import {
     UpdateMaintenancePayload,
 } from '../../core/entities/locker-operations';
 
-interface LockerListApiResponse {
-    success?: boolean;
-    messageCode?: number;
-    messageText?: string;
-    response?: {
-        content?: any[];
-        totalElements?: number;
-        totalPages?: number;
-        number?: number;
-        size?: number;
-    };
-    data?: {
-        content?: any[];
-        totalElements?: number;
-        totalPages?: number;
-        number?: number;
-        size?: number;
-    };
-}
 
+// --- Unified generic API shape ---
 interface GenericApiResponse<T = any> {
     success?: boolean;
     messageCode?: number;
@@ -51,6 +33,16 @@ interface GenericApiResponse<T = any> {
     response?: T;
     data?: T;
 }
+
+// --- Typed specialization for paged lockers list ---
+type LockerListApiResponse = GenericApiResponse<{
+    content?: any[];
+    totalElements?: number;
+    totalPages?: number;
+    number?: number;
+    size?: number;
+}>;
+
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -71,8 +63,9 @@ class LockerOperationsService {
 
         const query = searchParams.toString();
         const payload = await this.request<LockerListApiResponse>(`/lockers${query ? `?${query}` : ''}`);
-        const response = payload.response ?? payload.data ?? payload;
-        const content = Array.isArray(response?.content) ? response?.content : [];
+        const response = payload.response ?? payload.data ?? {};
+        const content = Array.isArray(response.content) ? response.content : [];
+
 
         const lockers = content.map((item) => this.mapLockerSummary(item));
         const locations = this.extractLocations(content);
@@ -140,21 +133,26 @@ class LockerOperationsService {
 
         const reservations: LockerReservation[] = Array.isArray(reservationsRaw)
             ? reservationsRaw.map((item) => ({
-                  id: String(item.id ?? item.reservationId ?? ''),
-                  userId: Number(item.userId ?? item.user?.id ?? 0),
-                  userName: item.userName ?? item.user?.name ?? 'Unknown user',
-                  lockerId: String(item.lockerId ?? item.locker?.id ?? ''),
-                  lockerNumber: item.lockerNumber ?? item.locker?.number ?? undefined,
-                  locationId: String(item.locationId ?? item.location?.id ?? ''),
-                  locationName: item.locationName ?? item.location?.name ?? undefined,
-                  reservedFrom: item.reservedFrom ?? item.startTime ?? item.startDate ?? '',
-                  reservedUntil: item.reservedUntil ?? item.endTime ?? item.endDate ?? '',
-                  reservationType: item.reservationType ?? item.type ?? 'GENERAL',
-                  status: item.status ?? item.reservationStatus ?? 'ACTIVE',
-                  notes: item.notes ?? undefined,
-                  createdAt: item.createdAt ?? undefined,
-              }))
+                id: String(item.id ?? item.reservationId ?? ''),
+                userId: Number(item.userId ?? item.user?.id ?? 0),
+                userName: item.userName ?? item.user?.name ?? 'Unknown user',
+                lockerId: String(item.lockerId ?? item.locker?.id ?? ''),
+                lockerNumber: item.lockerNumber ?? item.locker?.number ?? undefined,
+                locationId: String(item.locationId ?? item.location?.id ?? ''),
+                locationName: item.locationName ?? item.location?.name ?? undefined,
+                reservedFrom: item.reservedFrom ?? item.startTime ?? item.startDate ?? '',
+                reservedUntil: item.reservedUntil ?? item.endTime ?? item.endDate ?? '',
+                reservationType: item.reservationType ?? item.type ?? 'GENERAL',
+                status: item.status ?? item.reservationStatus ?? 'ACTIVE',
+                notes: item.notes ?? undefined,
+                createdAt: item.createdAt ?? undefined,
+                lockerSize:
+                    (item.lockerSize ??
+                        item.locker?.size ??
+                        'MEDIUM') as LockerReservation['lockerSize'],
+            }))
             : [];
+
 
         return {
             location,
@@ -196,7 +194,7 @@ class LockerOperationsService {
             method: 'POST',
             body: payload,
         });
-        const message = response.messageText ?? response.message ?? 'Bulk operation completed';
+        const message = response.messageText ?? response.messageText ?? 'Bulk operation completed';
         return { message };
     }
 

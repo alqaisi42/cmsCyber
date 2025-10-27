@@ -92,7 +92,7 @@ export interface LockerSummary {
     features?: string[];
     currentReservation?: LockerReservation | null;
     nextAvailableFrom?: string | null;
-    isActive?: boolean;
+    isActive: boolean;
     maxCapacity?: number;
     availableCapacity?: number;
     isCurrentlyAvailable?: boolean;
