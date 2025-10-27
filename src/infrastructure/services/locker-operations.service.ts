@@ -55,7 +55,7 @@ interface GenericApiResponse<T = any> {
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
-    private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api/v1';
+    private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api/locker-operations';
 
     async getLockers(params: { page?: number; size?: number; locationId?: string } = {}): Promise<LockerListResult> {
         const searchParams = new URLSearchParams();
