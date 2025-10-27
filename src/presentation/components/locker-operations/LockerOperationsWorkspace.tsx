@@ -69,6 +69,7 @@ export function LockerOperationsWorkspace() {
         reservations,
         subscriptions,
         selectedLocker,
+        selectedLockerId,
         loadingList,
         loadingOverview,
         loadingLockerInsights,
@@ -126,6 +127,7 @@ export function LockerOperationsWorkspace() {
         if (locationLockers.length === 1) return locationLockers[0];
         return locationLockers.find((locker) => locker.id === selectedLockerId) ?? locationLockers[0] ?? null;
     }, [locationLockers, selectedLocker, selectedLockerId]);
+
 
     const isLoading = loadingList || loadingOverview;
 

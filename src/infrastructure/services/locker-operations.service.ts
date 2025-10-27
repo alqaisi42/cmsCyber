@@ -46,7 +46,7 @@ interface LocationOverviewFilters {
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
-    private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api/locker-operations';
+    private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api';
     private readonly locationsTreeUrl =
         process.env.NEXT_PUBLIC_LOCKER_LOCATIONS_TREE_URL || '/api/v1/admin/lockers/locations/tree';
 
@@ -288,7 +288,7 @@ class LockerOperationsService {
             method: 'POST',
             body: payload,
         });
-        const message = response.messageText ?? response.message ?? 'Bulk operation completed';
+        const message = response.messageText ?? response.messageText ?? 'Bulk operation completed';
         return { message };
     }
 
