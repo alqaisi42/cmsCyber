@@ -72,7 +72,6 @@ export function LockerOperationsWorkspace() {
         loadingList,
         loadingOverview,
         loadingLockerInsights,
-        selectedLockerId,
         setSelectedLocationId,
         setSelectedLockerId,
         createLocker,

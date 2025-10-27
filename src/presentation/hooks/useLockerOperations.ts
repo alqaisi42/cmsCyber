@@ -315,7 +315,6 @@ export function useLockerOperations() {
     return {
         ...state,
         selectedLocation,
-        selectedLockerId: state.selectedLockerId,
         loadLockers,
         loadLocationOverview,
         loadLockerInsights,
