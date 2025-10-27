@@ -17,7 +17,6 @@ import {
     CreateIssuePayload,
     CreateLockerPayload,
     LockerIssuesMaintenanceOverview,
-    LockerListResult,
     LockerLocationDigest,
     LockerLocationOverview,
     LockerSubscriptionDigest,
@@ -138,6 +137,11 @@ export function useLockerOperations() {
                     selectedLocker,
                     lockers,
                     loadingOverview: false,
+                    pagination: {
+                        page: 0,
+                        size: lockers.length,
+                        totalElements: lockers.length,
+                    },
                 }));
 
                 if (selectedLockerId) {
@@ -158,49 +162,54 @@ export function useLockerOperations() {
         [loadLockerInsights, pushToast, setPartialState, state.lockers, state.selectedLockerId]
     );
 
-    const loadLockers = useCallback(
-        async (options: { page?: number; size?: number; locationId?: string } = {}) => {
+    const loadLocations = useCallback(
+        async (preferredLocationId?: string, options: { skipOverview?: boolean } = {}) => {
             setPartialState({ loadingList: true });
             try {
-                const result: LockerListResult = await lockerOperationsService.getLockers(options);
-                const firstLocationId = options.locationId ?? result.locations[0]?.id ?? null;
+                const digests = await lockerOperationsService.getLocationDigests();
+                const nextLocationId = preferredLocationId ?? state.selectedLocationId ?? digests[0]?.id ?? null;
 
                 setState((prev) => ({
                     ...prev,
-                    lockers: result.lockers,
-                    locations: result.locations,
-                    pagination: {
-                        page: result.page,
-                        size: result.size,
-                        totalElements: result.totalElements,
-                    },
-                    selectedLocationId: firstLocationId,
+                    locations: digests,
                     loadingList: false,
                 }));
 
-                if (firstLocationId) {
-                    await loadLocationOverview(firstLocationId, false);
-                } else {
-                    setPartialState({ locationOverview: null, selectedLockerId: null, selectedLocker: null });
+                if (!options.skipOverview && nextLocationId) {
+                    await loadLocationOverview(nextLocationId, true);
+                } else if (!nextLocationId) {
+                    setState((prev) => ({
+                        ...prev,
+                        selectedLocationId: null,
+                        selectedLockerId: null,
+                        selectedLocker: null,
+                        locationOverview: null,
+                        lockers: [],
+                        reservations: [],
+                        subscriptions: [],
+                        loadingOverview: false,
+                        loadingLockerInsights: false,
+                        pagination: { page: 0, size: 0, totalElements: 0 },
+                    }));
                 }
             } catch (error) {
-                console.error('Failed to load lockers', error);
+                console.error('Failed to load locations', error);
                 pushToast({
-                    title: 'Unable to load lockers',
-                    description: error instanceof Error ? error.message : 'Unexpected error fetching lockers.',
+                    title: 'Unable to load locations',
+                    description: error instanceof Error ? error.message : 'Unexpected error fetching locations.',
                     type: 'error',
                 });
                 setPartialState({ loadingList: false });
             }
         },
-        [loadLocationOverview, pushToast, setPartialState]
+        [loadLocationOverview, pushToast, setPartialState, state.selectedLocationId]
     );
 
     useEffect(() => {
-        loadLockers({ page: 0, size: 20 }).catch((error) => {
-            console.error('Initial lockers load failed', error);
+        loadLocations().catch((error) => {
+            console.error('Initial locker locations load failed', error);
         });
-    }, [loadLockers]);
+    }, [loadLocations]);
 
     const createLocker = useCallback(
         async (payload: CreateLockerPayload) => {
@@ -210,9 +219,10 @@ export function useLockerOperations() {
                 description: `${payload.name} has been created successfully`,
                 type: 'success',
             });
-            await loadLockers({ locationId: payload.locationId });
+            await loadLocationOverview(payload.locationId, false);
+            await loadLocations(payload.locationId, { skipOverview: true });
         },
-        [loadLockers, pushToast]
+        [loadLocationOverview, loadLocations, pushToast]
     );
 
     const bulkCreateLockers = useCallback(
@@ -223,9 +233,10 @@ export function useLockerOperations() {
                 description: result.message,
                 type: 'success',
             });
-            await loadLockers({ locationId: payload.locationId });
+            await loadLocationOverview(payload.locationId, false);
+            await loadLocations(payload.locationId, { skipOverview: true });
         },
-        [loadLockers, pushToast]
+        [loadLocationOverview, loadLocations, pushToast]
     );
 
     const updateLockerStatus = useCallback(
@@ -236,10 +247,13 @@ export function useLockerOperations() {
                 description: 'Locker status has been updated successfully.',
                 type: 'success',
             });
-            await loadLocationOverview(state.selectedLocationId ?? '', false);
+            if (state.selectedLocationId) {
+                await loadLocationOverview(state.selectedLocationId, false);
+                await loadLocations(state.selectedLocationId, { skipOverview: true });
+            }
             await loadLockerInsights(lockerId, true);
         },
-        [loadLocationOverview, loadLockerInsights, pushToast, state.selectedLocationId]
+        [loadLocationOverview, loadLocations, loadLockerInsights, pushToast, state.selectedLocationId]
     );
 
     const createIssue = useCallback(
@@ -315,7 +329,7 @@ export function useLockerOperations() {
     return {
         ...state,
         selectedLocation,
-        loadLockers,
+        loadLocations,
         loadLocationOverview,
         loadLockerInsights,
         createLocker,
