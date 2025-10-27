@@ -35,6 +35,13 @@ interface LockerListApiResponse {
         number?: number;
         size?: number;
     };
+    data?: {
+        content?: any[];
+        totalElements?: number;
+        totalPages?: number;
+        number?: number;
+        size?: number;
+    };
 }
 
 interface GenericApiResponse<T = any> {
