@@ -119,3 +119,4 @@ export * from './orders';
 export * from './locker-subscription';
 export * from './lockers';
 export * from './locker-support';
+export * from './locker-operations';

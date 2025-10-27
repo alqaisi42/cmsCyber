@@ -19,6 +19,7 @@ import {
     Tag,
     CreditCard,
     LifeBuoy,
+    RefreshCw,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from "../../shared/utils/cn";
@@ -75,6 +76,11 @@ const navigationItems = [
         title: 'Lockers',
         href: '/dashboard/lockers',
         icon: Lock,
+    },
+    {
+        title: 'Locker Operations',
+        href: '/dashboard/locker-operations',
+        icon: RefreshCw,
     },
     {
         title: 'Locker Subscriptions',
