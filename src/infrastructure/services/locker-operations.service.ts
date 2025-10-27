@@ -47,8 +47,23 @@ type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
     private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api/locker-operations';
+    private readonly locationsTreeUrl =
+        process.env.NEXT_PUBLIC_LOCKER_LOCATIONS_TREE_URL || '/api/v1/admin/lockers/locations/tree';
 
     async getLocationDigests(): Promise<LockerLocationDigest[]> {
+        try {
+            const treeNodes = await this.fetchLocationsTree();
+            const digests = this.extractLocationNodes(treeNodes)
+                .map((item) => this.mapLocationDigest(item))
+                .filter((location): location is LockerLocationDigest => Boolean(location?.id));
+
+            if (digests.length) {
+                return digests;
+            }
+        } catch (error) {
+            console.warn('Failed to load locations tree, falling back to admin locations list.', error);
+        }
+
         const payload = await this.request<GenericApiResponse<any>>('/admin/locations');
         const data = this.unwrap(payload);
         const list = Array.isArray(data?.data)
@@ -501,6 +516,78 @@ class LockerOperationsService {
     private normalizeNumber(value: any, fallback = 0): number {
         const num = Number(value);
         return Number.isFinite(num) ? num : fallback;
+    }
+
+    private extractLocationNodes(nodes: any[]): any[] {
+        const stack = Array.isArray(nodes) ? [...nodes] : [];
+        const results: any[] = [];
+
+        while (stack.length) {
+            const node = stack.shift();
+            if (!node) continue;
+
+            if (String(node.type ?? '').toUpperCase() === 'LOCATION') {
+                results.push(node);
+            }
+
+            const children = Array.isArray(node.children) ? node.children : [];
+            stack.push(...children);
+        }
+
+        return results;
+    }
+
+    private async fetchLocationsTree(): Promise<any[]> {
+        const headers: HeadersInit = {
+            Accept: 'application/json',
+        };
+
+        const token = this.resolveToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(this.locationsTreeUrl, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            const fallbackMessage = response.statusText || 'Failed to load locations tree';
+            const errorText = await response.text().catch(() => '');
+
+            if (!errorText) {
+                throw new Error(fallbackMessage);
+            }
+
+            try {
+                const parsed = JSON.parse(errorText);
+                const message = parsed?.message ?? parsed?.messageText ?? parsed?.error ?? fallbackMessage;
+                throw new Error(message || fallbackMessage);
+            } catch (parseError) {
+                throw new Error(errorText || fallbackMessage);
+            }
+        }
+
+        const payload = await response.json().catch(() => null);
+        if (!payload) {
+            return [];
+        }
+
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+
+        if (Array.isArray(payload.data)) {
+            return payload.data;
+        }
+
+        if (Array.isArray(payload.response)) {
+            return payload.response;
+        }
+
+        return [];
     }
 
     private async request<T>(path: string, init?: { method?: RequestMethod; body?: any }): Promise<T> {
