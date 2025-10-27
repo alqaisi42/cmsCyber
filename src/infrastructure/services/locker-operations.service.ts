@@ -14,7 +14,6 @@ import {
     CreateIssuePayload,
     CreateLockerPayload,
     LockerIssuesMaintenanceOverview,
-    LockerListResult,
     LockerLocationDigest,
     LockerLocationOverview,
     LockerSubscriptionDigest,
@@ -24,26 +23,6 @@ import {
     UpdateMaintenancePayload,
 } from '../../core/entities/locker-operations';
 
-interface LockerListApiResponse {
-    success?: boolean;
-    messageCode?: number;
-    messageText?: string;
-    response?: {
-        content?: any[];
-        totalElements?: number;
-        totalPages?: number;
-        number?: number;
-        size?: number;
-    };
-    data?: {
-        content?: any[];
-        totalElements?: number;
-        totalPages?: number;
-        number?: number;
-        size?: number;
-    };
-}
-
 interface GenericApiResponse<T = any> {
     success?: boolean;
     messageCode?: number;
@@ -52,49 +31,113 @@ interface GenericApiResponse<T = any> {
     data?: T;
 }
 
+interface LocationOverviewFilters {
+    subscriptionId?: string;
+    status?: string;
+    size?: string;
+    maintenanceStatus?: string;
+    isActive?: boolean;
+    hasOpenIssues?: boolean;
+    needsMaintenance?: boolean;
+    includeReservations?: boolean;
+    includeIssueCounts?: boolean;
+}
+
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
     private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api/locker-operations';
 
-    async getLockers(params: { page?: number; size?: number; locationId?: string } = {}): Promise<LockerListResult> {
-        const searchParams = new URLSearchParams();
-        if (typeof params.page === 'number') {
-            searchParams.set('page', String(params.page));
-        }
-        if (typeof params.size === 'number') {
-            searchParams.set('size', String(params.size));
-        }
-        if (params.locationId) {
-            searchParams.set('locationId', params.locationId);
-        }
+    async getLocationDigests(): Promise<LockerLocationDigest[]> {
+        const payload = await this.request<GenericApiResponse<any>>('/admin/locations');
+        const data = this.unwrap(payload);
+        const list = Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data)
+            ? data
+            : Array.isArray(data?.response)
+            ? data.response
+            : [];
 
-        const query = searchParams.toString();
-        const payload = await this.request<LockerListApiResponse>(`/lockers${query ? `?${query}` : ''}`);
-        const response = payload.response ?? payload.data ?? payload;
-        const content = Array.isArray(response?.content) ? response?.content : [];
-
-        const lockers = content.map((item) => this.mapLockerSummary(item));
-        const locations = this.extractLocations(content);
-
-        return {
-            lockers,
-            locations,
-            totalElements: typeof response?.totalElements === 'number' ? response.totalElements : lockers.length,
-            page: typeof response?.number === 'number' ? response.number : params.page ?? 0,
-            size: typeof response?.size === 'number' ? response.size : params.size ?? lockers.length,
-        };
+        return list
+            .map((item) => this.mapLocationDigest(item))
+            .filter((location): location is LockerLocationDigest => Boolean(location?.id));
     }
 
-    async getLocationOverview(locationId: string): Promise<LockerLocationOverview> {
-        const payload = await this.request<GenericApiResponse<any>>(`/locations/${locationId}/lockers`);
-        const data = payload.response ?? payload.data ?? payload;
+    async getLocationOverview(locationId: string, filters: LocationOverviewFilters = {}): Promise<LockerLocationOverview> {
+        if (!locationId) {
+            throw new Error('Location id is required to load overview');
+        }
 
-        const locationRaw = data?.location ?? data?.response?.location ?? null;
-        const statisticsRaw = data?.statistics ?? data?.response?.statistics ?? {};
-        const lockersRaw = data?.lockers ?? data?.response?.lockers ?? data?.response?.content ?? [];
-        const subscriptionsRaw = data?.subscriptions ?? data?.response?.subscriptions ?? [];
-        const reservationsRaw = data?.reservations ?? data?.response?.reservations ?? [];
+        const searchParams = new URLSearchParams();
+        if (filters.subscriptionId) searchParams.set('subscriptionId', filters.subscriptionId);
+        if (filters.status) searchParams.set('status', filters.status);
+        if (filters.size) searchParams.set('size', filters.size);
+        if (filters.maintenanceStatus) searchParams.set('maintenanceStatus', filters.maintenanceStatus);
+        if (typeof filters.isActive === 'boolean') searchParams.set('isActive', String(filters.isActive));
+        if (typeof filters.hasOpenIssues === 'boolean') searchParams.set('hasOpenIssues', String(filters.hasOpenIssues));
+        if (typeof filters.needsMaintenance === 'boolean')
+            searchParams.set('needsMaintenance', String(filters.needsMaintenance));
+        if (typeof filters.includeReservations === 'boolean')
+            searchParams.set('includeReservations', String(filters.includeReservations));
+        if (typeof filters.includeIssueCounts === 'boolean')
+            searchParams.set('includeIssueCounts', String(filters.includeIssueCounts));
+
+        const query = searchParams.toString();
+
+        const [overviewResult, lockersResult, subscriptionsResult, activeReservationsResult, upcomingReservationsResult] =
+            await Promise.allSettled([
+                this.request<GenericApiResponse<any>>(
+                    `/admin/locations/${locationId}/lockers/overview${query ? `?${query}` : ''}`
+                ),
+                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/lockers${query ? `?${query}` : ''}`),
+                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/subscriptions`),
+                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/reservations/active`),
+                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/reservations/upcoming`),
+            ]);
+
+        if (overviewResult.status !== 'fulfilled') {
+            throw overviewResult.reason instanceof Error
+                ? overviewResult.reason
+                : new Error('Failed to load location overview');
+        }
+
+        if (lockersResult.status !== 'fulfilled') {
+            console.warn('Failed to fetch location lockers list', lockersResult.reason);
+        }
+        if (subscriptionsResult.status !== 'fulfilled') {
+            console.warn('Failed to fetch location subscriptions', subscriptionsResult.reason);
+        }
+        if (activeReservationsResult.status !== 'fulfilled') {
+            console.warn('Failed to fetch active reservations', activeReservationsResult.reason);
+        }
+        if (upcomingReservationsResult.status !== 'fulfilled') {
+            console.warn('Failed to fetch upcoming reservations', upcomingReservationsResult.reason);
+        }
+
+        const overviewPayload = overviewResult.value;
+        const lockersPayload = lockersResult.status === 'fulfilled' ? lockersResult.value : null;
+        const subscriptionsPayload = subscriptionsResult.status === 'fulfilled' ? subscriptionsResult.value : null;
+        const activeReservationsPayload = activeReservationsResult.status === 'fulfilled' ? activeReservationsResult.value : null;
+        const upcomingReservationsPayload =
+            upcomingReservationsResult.status === 'fulfilled' ? upcomingReservationsResult.value : null;
+
+        const overviewData = this.unwrap(overviewPayload)?.data ?? this.unwrap(overviewPayload);
+        const overviewRoot = overviewData?.data ?? overviewData ?? {};
+        const locationRaw = overviewRoot?.location ?? overviewData?.location ?? null;
+        const statisticsRaw = overviewRoot?.statistics ?? overviewData?.statistics ?? {};
+        const lockersRaw = overviewRoot?.lockers ?? overviewRoot?.data ?? [];
+
+        const lockersResponse = this.unwrap(lockersPayload);
+        const lockersList = Array.isArray(lockersResponse?.data)
+            ? lockersResponse.data
+            : Array.isArray(lockersResponse)
+            ? lockersResponse
+            : [];
+
+        const subscriptionsRaw = this.extractArray(subscriptionsPayload);
+        const activeReservationsRaw = this.extractArray(activeReservationsPayload);
+        const upcomingReservationsRaw = this.extractArray(upcomingReservationsPayload);
 
         const location = locationRaw
             ? {
@@ -117,44 +160,78 @@ class LockerOperationsService {
             : null;
 
         const statistics = {
-            totalLockers: this.normalizeNumber(statisticsRaw?.totalLockers, lockersRaw?.length ?? 0),
+            totalLockers: this.normalizeNumber(statisticsRaw?.totalLockers, lockersList.length || lockersRaw?.length || 0),
             availableLockers: this.normalizeNumber(statisticsRaw?.availableLockers),
             occupiedLockers: this.normalizeNumber(statisticsRaw?.occupiedLockers),
-            maintenanceLockers: this.normalizeNumber(statisticsRaw?.maintenanceLockers),
+            maintenanceLockers: this.normalizeNumber(statisticsRaw?.maintenanceLockers ?? statisticsRaw?.maintenanceLockersCount),
         };
 
-        const lockers = Array.isArray(lockersRaw)
-            ? lockersRaw.map((locker) => this.mapLockerDetails(locker))
+        const lockersSource = Array.isArray(lockersRaw) && lockersRaw.length ? lockersRaw : lockersList;
+        const lockers = Array.isArray(lockersSource)
+            ? lockersSource.map((locker) => this.mapLockerDetails(locker))
             : [];
 
-        const subscriptions: LockerSubscriptionDigest[] = Array.isArray(subscriptionsRaw)
-            ? subscriptionsRaw.map((item) => ({
-                  id: String(item.id ?? item.subscriptionId ?? ''),
-                  name: item.name ?? item.planName ?? item.subscriptionName,
-                  ownerName: item.ownerName ?? item.owner ?? item.userName,
-                  lockerCount: this.normalizeNumber(item.lockerCount ?? item.totalLockers),
-                  activeReservations: this.normalizeNumber(item.activeReservations ?? item.reservationCount),
-                  status: item.status ?? item.subscriptionStatus,
-              }))
-            : [];
+        const subscriptions: LockerSubscriptionDigest[] = subscriptionsRaw.map((item) => ({
+            id: String(item.id ?? item.subscriptionId ?? ''),
+            name: item.name ?? item.planName ?? item.subscriptionName ?? item.code ?? undefined,
+            ownerName: item.ownerName ?? item.owner ?? item.userName ?? item.accountOwner,
+            lockerCount: this.normalizeNumber(item.lockerCount ?? item.totalLockers ?? item.lockersCount),
+            activeReservations: this.normalizeNumber(
+                item.activeReservations ?? item.activeReservationsCount ?? item.reservationCount
+            ),
+            status: item.status ?? item.subscriptionStatus ?? item.state,
+        }));
 
-        const reservations: LockerReservation[] = Array.isArray(reservationsRaw)
-            ? reservationsRaw.map((item) => ({
-                  id: String(item.id ?? item.reservationId ?? ''),
-                  userId: Number(item.userId ?? item.user?.id ?? 0),
-                  userName: item.userName ?? item.user?.name ?? 'Unknown user',
-                  lockerId: String(item.lockerId ?? item.locker?.id ?? ''),
-                  lockerNumber: item.lockerNumber ?? item.locker?.number ?? undefined,
-                  locationId: String(item.locationId ?? item.location?.id ?? ''),
-                  locationName: item.locationName ?? item.location?.name ?? undefined,
-                  reservedFrom: item.reservedFrom ?? item.startTime ?? item.startDate ?? '',
-                  reservedUntil: item.reservedUntil ?? item.endTime ?? item.endDate ?? '',
-                  reservationType: item.reservationType ?? item.type ?? 'GENERAL',
-                  status: item.status ?? item.reservationStatus ?? 'ACTIVE',
-                  notes: item.notes ?? undefined,
-                  createdAt: item.createdAt ?? undefined,
-              }))
-            : [];
+        const mergeReservations = [...activeReservationsRaw, ...upcomingReservationsRaw];
+        const upcomingKeys = new Set(
+            upcomingReservationsRaw.map((reservation) =>
+                String(
+                    reservation.id ??
+                        reservation.reservationId ??
+                        reservation.orderId ??
+                        `${reservation.lockerId ?? ''}-${reservation.reservedFrom ?? reservation.startTime ?? ''}`
+                )
+            )
+        );
+
+        const reservationsMap = new Map<string, LockerReservation>();
+
+        for (const item of mergeReservations) {
+            const key = String(
+                item.id ??
+                    item.reservationId ??
+                    item.orderId ??
+                    `${item.lockerId ?? ''}-${item.reservedFrom ?? item.startTime ?? ''}`
+            );
+
+            const isUpcoming = upcomingKeys.has(key);
+            const status = this.normalizeReservationStatus(item.status ?? item.reservationStatus, isUpcoming ? 'SCHEDULED' : 'ACTIVE');
+
+            reservationsMap.set(key, {
+                id: String(item.id ?? item.reservationId ?? key),
+                userId: Number(item.userId ?? item.user?.id ?? 0),
+                userName: item.userName ?? item.user?.name ?? 'Unknown user',
+                lockerId: String(item.lockerId ?? item.locker?.id ?? ''),
+                lockerNumber: String(item.lockerNumber ?? item.locker?.number ?? ''),
+                lockerSize: (item.lockerSize ?? item.size ?? item.locker?.size ?? 'MEDIUM') as LockerReservation['lockerSize'],
+                locationId: String(item.locationId ?? item.location?.id ?? locationId),
+                locationName: location?.name ?? item.locationName ?? item.location?.name ?? 'Unknown location',
+                locationAddress: location?.address ?? item.locationAddress ?? item.location?.address ?? undefined,
+                status,
+                reservationType: item.reservationType ?? item.type ?? 'GENERAL',
+                orderId: item.orderId ?? item.order?.id ?? undefined,
+                reservedFrom: item.reservedFrom ?? item.startTime ?? item.startDate ?? '',
+                reservedUntil: item.reservedUntil ?? item.endTime ?? item.endDate ?? '',
+                accessCode: item.accessCode ?? undefined,
+                accessCodeExpiresAt: item.accessCodeExpiresAt ?? undefined,
+                qrCode: item.qrCode ?? undefined,
+                notes: item.notes ?? item.comments ?? undefined,
+                createdAt: item.createdAt ?? item.timestamp ?? new Date().toISOString(),
+                updatedAt: item.updatedAt ?? undefined,
+            });
+        }
+
+        const reservations = Array.from(reservationsMap.values());
 
         return {
             location,
@@ -166,7 +243,7 @@ class LockerOperationsService {
     }
 
     async getLockerIssuesAndMaintenance(lockerId: string): Promise<LockerIssuesMaintenanceOverview> {
-        const payload = await this.request<GenericApiResponse<any>>(`/lockers/${lockerId}/issues-maintenance`);
+        const payload = await this.request<GenericApiResponse<any>>(`/admin/lockers/${lockerId}/issues-maintenance`);
         const data = payload.response ?? payload.data ?? payload;
 
         const lockerRaw = data?.locker ?? null;
@@ -183,7 +260,7 @@ class LockerOperationsService {
     }
 
     async createLocker(payload: CreateLockerPayload): Promise<LockerDetails> {
-        const response = await this.request<GenericApiResponse<any>>('/lockers', {
+        const response = await this.request<GenericApiResponse<any>>('/admin/lockers', {
             method: 'POST',
             body: payload,
         });
@@ -192,7 +269,7 @@ class LockerOperationsService {
     }
 
     async bulkCreateLockers(payload: BulkCreateLockerPayload): Promise<{ message: string }> {
-        const response = await this.request<GenericApiResponse<any>>('/lockers/bulk', {
+        const response = await this.request<GenericApiResponse<any>>('/admin/lockers/bulk', {
             method: 'POST',
             body: payload,
         });
@@ -201,14 +278,14 @@ class LockerOperationsService {
     }
 
     async updateLockerStatus(lockerId: string, payload: UpdateLockerStatusPayload): Promise<void> {
-        await this.request(`/lockers/${lockerId}/status`, {
+        await this.request(`/admin/lockers/${lockerId}/status`, {
             method: 'PUT',
             body: payload,
         });
     }
 
     async createIssue(payload: CreateIssuePayload): Promise<LockerIssue> {
-        const response = await this.request<GenericApiResponse<any>>('/issues', {
+        const response = await this.request<GenericApiResponse<any>>('/admin/issues', {
             method: 'POST',
             body: payload,
         });
@@ -217,21 +294,21 @@ class LockerOperationsService {
     }
 
     async updateIssue(issueId: string, payload: UpdateIssuePayload): Promise<void> {
-        await this.request(`/issues/${issueId}`, {
+        await this.request(`/admin/issues/${issueId}`, {
             method: 'PATCH',
             body: payload,
         });
     }
 
     async addIssueComment(issueId: string, comment: { comment: string; isInternal?: boolean }): Promise<void> {
-        await this.request(`/issues/${issueId}/comments`, {
+        await this.request(`/admin/issues/${issueId}/comments`, {
             method: 'POST',
             body: comment,
         });
     }
 
     async scheduleMaintenance(lockerId: string, payload: ScheduleMaintenancePayload): Promise<LockerMaintenanceRecord> {
-        const response = await this.request<GenericApiResponse<any>>('/maintenance', {
+        const response = await this.request<GenericApiResponse<any>>('/admin/maintenance', {
             method: 'POST',
             body: {
                 lockerId,
@@ -243,46 +320,48 @@ class LockerOperationsService {
     }
 
     async updateMaintenance(maintenanceId: string, payload: UpdateMaintenancePayload): Promise<void> {
-        await this.request(`/maintenance/${maintenanceId}`, {
+        await this.request(`/admin/maintenance/${maintenanceId}`, {
             method: 'PATCH',
             body: payload,
         });
     }
 
-    private extractLocations(content: any[]): LockerLocationDigest[] {
-        const lookup = new Map<string, LockerLocationDigest>();
-        for (const item of content) {
-            const locationId = String(item.locationId ?? item.location?.id ?? '');
-            if (!locationId) continue;
-            const existing = lookup.get(locationId);
-            const status = String(item.status ?? '').toUpperCase();
-            const maintenance = String(item.maintenanceStatus ?? '').toUpperCase();
-
-            const totals = {
-                totalLockers: 1,
-                availableLockers: status === 'AVAILABLE' ? 1 : 0,
-                maintenanceLockers:
-                    maintenance === 'UNDER_MAINTENANCE' || maintenance === 'REQUIRES_MAINTENANCE' ? 1 : 0,
-            };
-
-            if (existing) {
-                existing.totalLockers += totals.totalLockers;
-                existing.availableLockers += totals.availableLockers;
-                existing.maintenanceLockers += totals.maintenanceLockers;
-            } else {
-                lookup.set(locationId, {
-                    id: locationId,
-                    code: item.location?.code ?? undefined,
-                    name: item.locationName ?? item.location?.name ?? 'Unknown location',
-                    address: item.location?.address ?? null,
-                    totalLockers: totals.totalLockers,
-                    availableLockers: totals.availableLockers,
-                    maintenanceLockers: totals.maintenanceLockers,
-                });
-            }
+    private mapLocationDigest(dto: any): LockerLocationDigest | null {
+        if (!dto) {
+            return null;
         }
 
-        return Array.from(lookup.values()).sort((a, b) => a.name.localeCompare(b.name));
+        const id = dto.id ?? dto.locationId ?? dto.location?.id;
+        if (!id) {
+            return null;
+        }
+
+        return {
+            id: String(id),
+            code: dto.code ?? dto.locationCode ?? dto.location?.code ?? undefined,
+            name: dto.name ?? dto.locationName ?? dto.location?.name ?? dto.title ?? 'Unknown location',
+            address: dto.address ?? dto.locationAddress ?? dto.location?.address ?? null,
+            totalLockers: this.normalizeNumber(
+                dto.totalLockers ?? dto.lockersCount ?? dto.lockerCount ?? dto.total ?? dto.totalCount ?? dto.totalLockersCount
+            ),
+            availableLockers: this.normalizeNumber(
+                dto.availableLockers ??
+                    dto.availableLockerCount ??
+                    dto.available ??
+                    dto.availableCount ??
+                    dto.openLockers ??
+                    dto.freeLockers
+            ),
+            maintenanceLockers: this.normalizeNumber(
+                dto.maintenanceLockers ??
+                    dto.maintenanceLockersCount ??
+                    dto.maintenanceCount ??
+                    dto.pendingMaintenance ??
+                    dto.attentionRequired ??
+                    dto.needsMaintenanceCount ??
+                    0
+            ),
+        };
     }
 
     private mapLockerSummary(dto: any): LockerSummary {
@@ -382,6 +461,43 @@ class LockerOperationsService {
         } as LockerMaintenanceRecord;
     }
 
+    private extractArray(payload: GenericApiResponse<any> | any): any[] {
+        const data = this.unwrap(payload);
+        if (Array.isArray(data)) {
+            return data;
+        }
+        if (Array.isArray(data?.data)) {
+            return data.data;
+        }
+        if (Array.isArray(data?.response)) {
+            return data.response;
+        }
+        return [];
+    }
+
+    private unwrap<T = any>(payload: GenericApiResponse<T> | any): any {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+            return payload;
+        }
+
+        const maybeResponse = (payload as GenericApiResponse<any>).response;
+        const maybeData = (payload as GenericApiResponse<any>).data;
+
+        return maybeResponse ?? maybeData ?? payload;
+    }
+
+    private normalizeReservationStatus(
+        value: any,
+        fallback: LockerReservation['status'] = 'ACTIVE'
+    ): LockerReservation['status'] {
+        const normalized = String(value ?? '').toUpperCase();
+        const allowed: LockerReservation['status'][] = ['CONFIRMED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'EXPIRED', 'SCHEDULED'];
+        if (allowed.includes(normalized as LockerReservation['status'])) {
+            return normalized as LockerReservation['status'];
+        }
+        return fallback;
+    }
+
     private normalizeNumber(value: any, fallback = 0): number {
         const num = Number(value);
         return Number.isFinite(num) ? num : fallback;
@@ -413,17 +529,26 @@ class LockerOperationsService {
                         ? init.body
                         : JSON.stringify(init.body)
                     : undefined,
+            cache: 'no-store',
         });
 
         const text = await response.text();
-        const data = text ? JSON.parse(text) : {};
+        let data: any = {};
+
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch (error) {
+                data = { message: text };
+            }
+        }
 
         if (!response.ok || data?.success === false) {
-            const message = data?.messageText ?? data?.message ?? response.statusText;
+            const message = data?.messageText ?? data?.message ?? data?.error ?? response.statusText;
             throw new Error(message || 'Request failed');
         }
 
-        return data as T;
+        return (data as T) ?? ({} as T);
     }
 
     private resolveToken(): string | null {

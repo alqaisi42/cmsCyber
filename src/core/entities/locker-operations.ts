@@ -53,14 +53,6 @@ export interface LockerIssuesMaintenanceOverview {
     maintenanceRecords: LockerMaintenanceRecord[];
 }
 
-export interface LockerListResult {
-    lockers: LockerSummary[];
-    totalElements: number;
-    page: number;
-    size: number;
-    locations: LockerLocationDigest[];
-}
-
 export interface CreateLockerPayload {
     code: string;
     name: string;

@@ -264,7 +264,7 @@ export interface LockerReservation {
     locationId: string;
     locationName: string;
     locationAddress?: string;
-    status: 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+    status: 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED' | 'SCHEDULED';
     reservationType: string;
     orderId?: string;
     reservedFrom: string;

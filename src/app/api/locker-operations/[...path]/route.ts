@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_API_URL = (process.env.BACKEND_API_URL || 'http://148.230.111.245:32080').replace(/\/$/, '');
-const BACKEND_API_PREFIX = process.env.BACKEND_API_PREFIX ?? 'api/v1';
+const BACKEND_API_PREFIX = process.env.BACKEND_API_PREFIX ?? 'api';
 
 type SupportedMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
