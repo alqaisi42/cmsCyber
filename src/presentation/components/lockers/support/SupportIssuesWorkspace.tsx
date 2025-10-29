@@ -200,7 +200,7 @@ function applyFilters(
     issues: LockerIssue[],
     filters: ExtendedFilters
 ): LockerIssue[] {
-    let filtered = [...issues];
+    let filtered = issues;
 
     if (filters.status) {
         filtered = filtered.filter((issue) => issue.status === filters.status);
@@ -884,18 +884,13 @@ export function SupportIssuesWorkspace({ token }: SupportIssuesWorkspaceProps) {
                 );
 
                 // Update local state
-                setAllIssues((prev) =>
-                    prev.map((issue) =>
+                setAllIssues((prev) => {
+                    const updatedIssues = prev.map((issue) =>
                         issue.id === response.data.id ? response.data : issue
-                    )
-                );
-                setBoardState(
-                    groupIssuesByStatus(
-                        allIssues.map((issue) =>
-                            issue.id === response.data.id ? response.data : issue
-                        )
-                    )
-                );
+                    );
+                    setBoardState(groupIssuesByStatus(updatedIssues));
+                    return updatedIssues;
+                });
                 setActiveIssue(response.data);
 
                 pushToast({
@@ -914,7 +909,7 @@ export function SupportIssuesWorkspace({ token }: SupportIssuesWorkspaceProps) {
                 setUpdatingIssue(false);
             }
         },
-        [activeIssue, token, allIssues, pushToast]
+        [activeIssue, token, pushToast]
     );
 
     const handleResolveIssue = useCallback(
@@ -955,15 +950,26 @@ export function SupportIssuesWorkspace({ token }: SupportIssuesWorkspaceProps) {
     // DRAG & DROP HANDLERS
     // ========================================================================
 
-    const handleDragStart = useCallback((event: DragStartEvent) => {
-        const { active } = event;
-        const issue = Object.values(boardState.columns)
-            .flat()
-            .find((i) => i.id === active.id);
-        if (issue) {
-            setDraggedIssue(issue);
-        }
-    }, [boardState.columns]);
+    const allBoardIssues = useMemo(
+        () => Object.values(boardState.columns).flat(),
+        [boardState.columns]
+    );
+
+    const findIssueById = useCallback(
+        (issueId: string) => allBoardIssues.find((issue) => issue.id === issueId) ?? null,
+        [allBoardIssues]
+    );
+
+    const handleDragStart = useCallback(
+        (event: DragStartEvent) => {
+            const { active } = event;
+            const issue = findIssueById(active.id as string);
+            if (issue) {
+                setDraggedIssue(issue);
+            }
+        },
+        [findIssueById]
+    );
 
     const handleDragEnd = useCallback(
         async (event: DragEndEvent) => {
@@ -976,9 +982,7 @@ export function SupportIssuesWorkspace({ token }: SupportIssuesWorkspaceProps) {
             const newStatus = over.id as LockerIssueStatus;
 
             // Find the issue being dragged
-            const issue = Object.values(boardState.columns)
-                .flat()
-                .find((i) => i.id === issueId);
+            const issue = findIssueById(issueId);
 
             if (!issue || issue.status === newStatus) return;
 
@@ -1022,7 +1026,7 @@ export function SupportIssuesWorkspace({ token }: SupportIssuesWorkspaceProps) {
                 });
             }
         },
-        [boardState.columns, token, allIssues, pushToast]
+        [findIssueById, token, allIssues, pushToast]
     );
 
     // ========================================================================
