@@ -1190,7 +1190,10 @@ export default function AdminOrdersPage() {
                                                     <div className="h-2 w-2 rounded-full bg-slate-400"/>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-900">{entry.status.replaceAll('_', ' ')}</p>
+                                                    <p className="text-sm font-semibold text-slate-900">
+                                                        {entry.status ? entry.status.replaceAll('_', ' ') : 'Unknown'}
+                                                    </p>
+
                                                     <p className="text-xs text-slate-500">{formatDate(entry.timestamp, 'time')}</p>
                                                     {entry.notes &&
                                                         <p className="text-xs text-slate-600 mt-1">{entry.notes}</p>}
