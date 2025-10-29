@@ -46,9 +46,14 @@ interface LocationOverviewFilters {
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
-    private readonly baseUrl = process.env.NEXT_PUBLIC_LOCKER_API_URL || '/api';
-    private readonly locationsTreeUrl =
+    private readonly baseUrl = (process.env.NEXT_PUBLIC_LOCKER_API_URL || '').replace(/\/+$/, '');
+    private readonly locationsTreeEndpoint =
         process.env.NEXT_PUBLIC_LOCKER_LOCATIONS_TREE_URL || '/api/v1/admin/lockers/locations/tree';
+
+    private readonly adminLockersBasePath = '/api/v1/admin/lockers';
+    private readonly adminLocationsBasePath = '/api/admin/locations';
+    private readonly issueMaintenanceBasePath = '/api/admin/lockers';
+    private readonly adminLockerIssuesBasePath = '/api/v1/admin/lockers/issues';
 
     async getLocationDigests(): Promise<LockerLocationDigest[]> {
         try {
@@ -64,7 +69,7 @@ class LockerOperationsService {
             console.warn('Failed to load locations tree, falling back to admin locations list.', error);
         }
 
-        const payload = await this.request<GenericApiResponse<any>>('/admin/locations');
+        const payload = await this.request<GenericApiResponse<any>>(this.adminLocationsBasePath);
         const data = this.unwrap(payload);
         const list = Array.isArray(data?.data)
             ? data.data
@@ -103,12 +108,20 @@ class LockerOperationsService {
         const [overviewResult, lockersResult, subscriptionsResult, activeReservationsResult, upcomingReservationsResult] =
             await Promise.allSettled([
                 this.request<GenericApiResponse<any>>(
-                    `/admin/locations/${locationId}/lockers/overview${query ? `?${query}` : ''}`
+                    `${this.adminLocationsBasePath}/${locationId}/lockers/overview${query ? `?${query}` : ''}`
                 ),
-                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/lockers${query ? `?${query}` : ''}`),
-                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/subscriptions`),
-                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/reservations/active`),
-                this.request<GenericApiResponse<any>>(`/admin/locations/${locationId}/reservations/upcoming`),
+                this.request<GenericApiResponse<any>>(
+                    `${this.adminLocationsBasePath}/${locationId}/lockers${query ? `?${query}` : ''}`
+                ),
+                this.request<GenericApiResponse<any>>(
+                    `${this.adminLocationsBasePath}/${locationId}/subscriptions`
+                ),
+                this.request<GenericApiResponse<any>>(
+                    `${this.adminLocationsBasePath}/${locationId}/reservations/active`
+                ),
+                this.request<GenericApiResponse<any>>(
+                    `${this.adminLocationsBasePath}/${locationId}/reservations/upcoming`
+                ),
             ]);
 
         if (overviewResult.status !== 'fulfilled') {
@@ -258,7 +271,9 @@ class LockerOperationsService {
     }
 
     async getLockerIssuesAndMaintenance(lockerId: string): Promise<LockerIssuesMaintenanceOverview> {
-        const payload = await this.request<GenericApiResponse<any>>(`/admin/lockers/${lockerId}/issues-maintenance`);
+        const payload = await this.request<GenericApiResponse<any>>(
+            `${this.issueMaintenanceBasePath}/${lockerId}/issues-maintenance/overview`
+        );
         const data = payload.response ?? payload.data ?? payload;
 
         const lockerRaw = data?.locker ?? null;
@@ -275,7 +290,7 @@ class LockerOperationsService {
     }
 
     async createLocker(payload: CreateLockerPayload): Promise<LockerDetails> {
-        const response = await this.request<GenericApiResponse<any>>('/admin/lockers', {
+        const response = await this.request<GenericApiResponse<any>>(this.adminLockersBasePath, {
             method: 'POST',
             body: payload,
         });
@@ -284,23 +299,26 @@ class LockerOperationsService {
     }
 
     async bulkCreateLockers(payload: BulkCreateLockerPayload): Promise<{ message: string }> {
-        const response = await this.request<GenericApiResponse<any>>('/admin/lockers/bulk', {
-            method: 'POST',
-            body: payload,
-        });
-        const message = response.messageText ?? response.messageText ?? 'Bulk operation completed';
+        const response = await this.request<GenericApiResponse<any>>(
+            `${this.adminLockersBasePath}/bulk`,
+            {
+                method: 'POST',
+                body: payload,
+            }
+        );
+        const message = response.messageText ?? response.message ?? 'Bulk operation completed';
         return { message };
     }
 
     async updateLockerStatus(lockerId: string, payload: UpdateLockerStatusPayload): Promise<void> {
-        await this.request(`/admin/lockers/${lockerId}/status`, {
+        await this.request(`${this.adminLockersBasePath}/${lockerId}/status`, {
             method: 'PUT',
             body: payload,
         });
     }
 
     async createIssue(payload: CreateIssuePayload): Promise<LockerIssue> {
-        const response = await this.request<GenericApiResponse<any>>('/admin/issues', {
+        const response = await this.request<GenericApiResponse<any>>(this.adminLockerIssuesBasePath, {
             method: 'POST',
             body: payload,
         });
@@ -309,33 +327,36 @@ class LockerOperationsService {
     }
 
     async updateIssue(issueId: string, payload: UpdateIssuePayload): Promise<void> {
-        await this.request(`/admin/issues/${issueId}`, {
-            method: 'PATCH',
+        await this.request(`${this.issueMaintenanceBasePath}/issues/${issueId}`, {
+            method: 'PUT',
             body: payload,
         });
     }
 
     async addIssueComment(issueId: string, comment: { comment: string; isInternal?: boolean }): Promise<void> {
-        await this.request(`/admin/issues/${issueId}/comments`, {
+        await this.request(`${this.issueMaintenanceBasePath}/issues/${issueId}/comments`, {
             method: 'POST',
             body: comment,
         });
     }
 
     async scheduleMaintenance(lockerId: string, payload: ScheduleMaintenancePayload): Promise<LockerMaintenanceRecord> {
-        const response = await this.request<GenericApiResponse<any>>('/admin/maintenance', {
-            method: 'POST',
-            body: {
-                lockerId,
-                ...payload,
-            },
-        });
+        const response = await this.request<GenericApiResponse<any>>(
+            `${this.issueMaintenanceBasePath}/${lockerId}/maintenance`,
+            {
+                method: 'POST',
+                body: {
+                    lockerId,
+                    ...payload,
+                },
+            }
+        );
         const data = response.response ?? response.data ?? response;
         return this.mapMaintenanceRecord({ ...data, lockerId });
     }
 
     async updateMaintenance(maintenanceId: string, payload: UpdateMaintenancePayload): Promise<void> {
-        await this.request(`/admin/maintenance/${maintenanceId}`, {
+        await this.request(`${this.issueMaintenanceBasePath}/maintenance/${maintenanceId}`, {
             method: 'PATCH',
             body: payload,
         });
@@ -547,7 +568,7 @@ class LockerOperationsService {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(this.locationsTreeUrl, {
+        const response = await fetch(this.buildUrl(this.locationsTreeEndpoint), {
             method: 'GET',
             headers,
             cache: 'no-store',
@@ -604,10 +625,7 @@ class LockerOperationsService {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const base = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
-        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-
-        const response = await fetch(`${base}${normalizedPath}`, {
+        const response = await fetch(this.buildUrl(path), {
             method: init?.method ?? 'GET',
             headers,
             body:
@@ -636,6 +654,28 @@ class LockerOperationsService {
         }
 
         return (data as T) ?? ({} as T);
+    }
+
+    private buildUrl(path: string): string {
+        if (!path) {
+            return this.baseUrl || '';
+        }
+
+        if (this.isAbsoluteUrl(path)) {
+            return path;
+        }
+
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+        if (!this.baseUrl) {
+            return normalizedPath;
+        }
+
+        return `${this.baseUrl}${normalizedPath}`;
+    }
+
+    private isAbsoluteUrl(url: string): boolean {
+        return /^https?:\/\//i.test(url);
     }
 
     private resolveToken(): string | null {
