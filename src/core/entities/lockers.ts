@@ -92,7 +92,7 @@ export interface LockerSummary {
     features?: string[];
     currentReservation?: LockerReservation | null;
     nextAvailableFrom?: string | null;
-    isActive?: boolean;
+    isActive: boolean;
     maxCapacity?: number;
     availableCapacity?: number;
     isCurrentlyAvailable?: boolean;
@@ -264,7 +264,7 @@ export interface LockerReservation {
     locationId: string;
     locationName: string;
     locationAddress?: string;
-    status: 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+    status: 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED' | 'SCHEDULED';
     reservationType: string;
     orderId?: string;
     reservedFrom: string;

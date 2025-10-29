@@ -556,6 +556,7 @@ class LockerManagementService {
                     availableTimeSlots: locker.availableTimeSlots,
                     nextAvailableFrom: locker.nextAvailableFrom ?? null,
                     isCurrentlyAvailable: locker.isCurrentlyAvailable ?? true,
+                    isActive : true
                 })),
             };
         } catch (error) {
