@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_API_URL = (process.env.BACKEND_API_URL || 'http://148.230.111.245:32080').replace(/\/$/, '');
+const BACKEND_API_URL = (process.env.BACKEND_API_URL || 'http://localhost:8050').replace(/\/$/, '');
 const BACKEND_API_PREFIX = process.env.BACKEND_API_PREFIX ?? 'api';
 const MAX_REDIRECTS = Number(process.env.LOCKER_API_PROXY_MAX_REDIRECTS ?? 3);
 

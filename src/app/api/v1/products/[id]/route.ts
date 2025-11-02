@@ -11,7 +11,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const BACKEND_URL = process.env.BACKEND_API_URL || 'http://148.230.111.245:32080';
+        const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:8050';
 
         const response = await fetch(`${BACKEND_URL}/api/v1/products/${params.id}`);
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_API_URL || 'http://148.230.111.245:32080';
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:8050';
 
 export async function POST(
     request: NextRequest,
