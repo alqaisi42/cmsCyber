@@ -306,7 +306,7 @@ class LockerOperationsService {
                 body: payload,
             }
         );
-        const message = response.messageText ?? response.message ?? 'Bulk operation completed';
+        const message = response.messageText ?? response.messageText ?? 'Bulk operation completed';
         return { message };
     }
 
