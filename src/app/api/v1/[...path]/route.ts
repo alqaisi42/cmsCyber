@@ -31,9 +31,12 @@ interface ErrorResponse {
  * Build the complete backend URL
  */
 function buildBackendUrl(path: string, searchParams?: string): string {
-    const url = `${BACKEND_URL}/api/v1/${path}`;
+    // ✅ ensure exactly one /api/v1 prefix — no stripping or doubling
+    const normalized = path.startsWith('api/v1/') ? path.substring(7) : path; // remove extra prefix if any
+    const url = `${BACKEND_URL}/api/v1/${normalized}`;
     return searchParams ? `${url}?${searchParams}` : url;
 }
+
 
 /**
  * Create standard headers
