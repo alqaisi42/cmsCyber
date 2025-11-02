@@ -669,6 +669,13 @@ class LockerOperationsService {
 
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
+        // When routing through the Next.js proxy handlers we need to keep the
+        // relative `/api/...` URL so that the browser calls the local route
+        // instead of the remote locker API base URL.
+        if (normalizedPath.startsWith('/api/')) {
+            return normalizedPath;
+        }
+
         if (!this.baseUrl) {
             return normalizedPath;
         }
