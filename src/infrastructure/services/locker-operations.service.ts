@@ -47,15 +47,15 @@ type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 class LockerOperationsService {
     private readonly baseUrl = (process.env.NEXT_PUBLIC_LOCKER_API_URL || '').replace(/\/+$/, '');
-    private readonly proxyBasePath = '/api/locker-operations';
+    private readonly proxyBasePath = '/api/';
     private readonly locationsTreeEndpoint =
         process.env.NEXT_PUBLIC_LOCKER_LOCATIONS_TREE_URL ||
         `${this.proxyBasePath}/v1/admin/lockers/locations/tree`;
 
-    private readonly adminLockersBasePath = `${this.proxyBasePath}/v1/admin/lockers`;
-    private readonly adminLocationsBasePath = `${this.proxyBasePath}/v1/admin/locations`;
-    private readonly issueMaintenanceBasePath = `${this.proxyBasePath}/v1/admin/lockers`;
-    private readonly adminLockerIssuesBasePath = `${this.proxyBasePath}/v1/admin/lockers/issues`;
+    private readonly adminLockersBasePath = `${this.proxyBasePath}/admin/lockers`;
+    private readonly adminLocationsBasePath = `${this.proxyBasePath}/admin/locations`;
+    private readonly issueMaintenanceBasePath = `${this.proxyBasePath}/admin/lockers`;
+    private readonly adminLockerIssuesBasePath = `${this.proxyBasePath}/admin/lockers/issues`;
 
     async getLocationDigests(): Promise<LockerLocationDigest[]> {
         try {
