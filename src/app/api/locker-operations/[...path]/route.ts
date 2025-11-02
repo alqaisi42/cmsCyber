@@ -3,8 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const BACKEND_API_URL = (process.env.BACKEND_API_URL || 'http://148.230.111.245:32080').replace(/\/$/, '');
 const BACKEND_API_PREFIX = process.env.BACKEND_API_PREFIX ?? 'api';
+const MAX_REDIRECTS = Number(process.env.LOCKER_API_PROXY_MAX_REDIRECTS ?? 3);
 
 type SupportedMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -21,6 +24,23 @@ function buildBackendUrl(path: string, searchParams?: string): string {
     const fullPath = prefix ? `${prefix}/${cleanedPath}` : cleanedPath;
     const url = `${BACKEND_API_URL}/${fullPath}`;
     return searchParams ? `${url}?${searchParams}` : url;
+}
+
+function isAbsoluteUrl(url: string): boolean {
+    return /^https?:\/\//i.test(url);
+}
+
+function resolveRedirectLocation(location: string): string {
+    if (!location) {
+        return '';
+    }
+
+    if (isAbsoluteUrl(location)) {
+        return location;
+    }
+
+    const normalizedLocation = location.replace(/^\/+/, '');
+    return `${BACKEND_API_URL}/${normalizedLocation}`;
 }
 
 function createHeaders(request: NextRequest, includeBody: boolean): HeadersInit {
@@ -40,9 +60,47 @@ function createHeaders(request: NextRequest, includeBody: boolean): HeadersInit 
     return headers;
 }
 
+function copyResponseHeaders(source: Response, target: NextResponse): void {
+    const hopByHopHeaders = new Set([
+        'connection',
+        'keep-alive',
+        'proxy-authenticate',
+        'proxy-authorization',
+        'te',
+        'trailers',
+        'transfer-encoding',
+        'upgrade',
+    ]);
+
+    source.headers.forEach((value, key) => {
+        const lowerKey = key.toLowerCase();
+        if (hopByHopHeaders.has(lowerKey)) {
+            return;
+        }
+
+        if (lowerKey === 'set-cookie') {
+            const headerWithCookies = source.headers as Headers & {
+                getSetCookie?: () => string[];
+            };
+            const cookies = headerWithCookies.getSetCookie?.();
+
+            if (cookies && cookies.length) {
+                cookies.forEach((cookie) => target.headers.append('Set-Cookie', cookie));
+            } else if (value) {
+                target.headers.append('Set-Cookie', value);
+            }
+            return;
+        }
+
+        target.headers.set(key, value);
+    });
+}
+
 async function forwardResponse(response: Response): Promise<NextResponse> {
     if (response.status === 204 || response.status === 205) {
-        return new NextResponse(null, { status: response.status });
+        const emptyResponse = new NextResponse(null, { status: response.status });
+        copyResponseHeaders(response, emptyResponse);
+        return emptyResponse;
     }
 
     const contentType = response.headers.get('content-type') ?? 'application/json';
@@ -50,7 +108,9 @@ async function forwardResponse(response: Response): Promise<NextResponse> {
     if (contentType.includes('application/json')) {
         try {
             const data = await response.json();
-            return NextResponse.json(data, { status: response.status });
+            const jsonResponse = NextResponse.json(data, { status: response.status });
+            copyResponseHeaders(response, jsonResponse);
+            return jsonResponse;
         } catch (error) {
             return NextResponse.json(
                 {
@@ -65,10 +125,43 @@ async function forwardResponse(response: Response): Promise<NextResponse> {
     }
 
     const text = await response.text();
-    return new NextResponse(text, {
+    const textResponse = new NextResponse(text, {
         status: response.status,
         headers: { 'Content-Type': contentType },
     });
+    copyResponseHeaders(response, textResponse);
+    return textResponse;
+}
+
+async function executeBackendRequest(url: string, init: RequestInit & { method: SupportedMethod }, redirectsLeft: number): Promise<Response> {
+    const response = await fetch(url, { ...init, redirect: 'manual' });
+
+    if (response.status >= 300 && response.status < 400) {
+        if (redirectsLeft <= 0) {
+            return response;
+        }
+
+        const locationHeader = response.headers.get('location');
+        if (!locationHeader) {
+            return response;
+        }
+
+        const redirectUrl = resolveRedirectLocation(locationHeader);
+        if (!redirectUrl) {
+            return response;
+        }
+
+        const nextInit: RequestInit & { method: SupportedMethod } = { ...init };
+
+        if (response.status === 303 && init.method !== 'GET') {
+            nextInit.method = 'GET';
+            nextInit.body = undefined;
+        }
+
+        return executeBackendRequest(redirectUrl, nextInit, redirectsLeft - 1);
+    }
+
+    return response;
 }
 
 async function proxyRequest(
@@ -114,12 +207,16 @@ async function proxyRequest(
     const headers = createHeaders(request, includeBody);
 
     try {
-        const response = await fetch(targetUrl, {
-            method: context.method,
-            headers,
-            body: includeBody && context.body !== undefined ? JSON.stringify(context.body) : undefined,
-            cache: 'no-store',
-        });
+        const response = await executeBackendRequest(
+            targetUrl,
+            {
+                method: context.method,
+                headers,
+                body: includeBody && context.body !== undefined ? JSON.stringify(context.body) : undefined,
+                cache: 'no-store',
+            },
+            Number.isFinite(MAX_REDIRECTS) && MAX_REDIRECTS >= 0 ? MAX_REDIRECTS : 3
+        );
 
         return await forwardResponse(response);
     } catch (error) {
