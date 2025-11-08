@@ -1,9 +1,6 @@
-// src/presentation/hooks/useLockerOperations.ts
-// Hook encapsulating locker operations orchestration state and actions.
-
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/ui/toast';
 import {
     LockerDetails,
@@ -72,22 +69,30 @@ const INITIAL_STATE: LockerOperationsState = {
 export function useLockerOperations() {
     const { pushToast } = useToast();
     const [state, setState] = useState<LockerOperationsState>(INITIAL_STATE);
+    const mountedRef = useRef(true);
 
     const setPartialState = useCallback((partial: Partial<LockerOperationsState>) => {
+        if (!mountedRef.current) return;
         setState((prev) => ({ ...prev, ...partial }));
     }, []);
 
+    // ==============================================================
+    // CORE LOADERS
+    // ==============================================================
+
     const loadLockerInsights = useCallback(
         async (lockerId: string, updateSelectedLocker = true) => {
-            if (!lockerId) return;
+            if (!lockerId || state.loadingLockerInsights) return;
+
             setPartialState({ loadingLockerInsights: true });
             try {
                 const overview: LockerIssuesMaintenanceOverview =
                     await lockerOperationsService.getLockerIssuesAndMaintenance(lockerId);
+
                 const selectedLocker = updateSelectedLocker
                     ? (state.locationOverview?.lockers.find((locker) => locker.id === lockerId) as LockerDetails | undefined) ??
-                      state.lockers.find((locker) => locker.id === lockerId) ??
-                      null
+                    state.lockers.find((locker) => locker.id === lockerId) ??
+                    null
                     : state.selectedLocker;
 
                 setState((prev) => ({
@@ -108,21 +113,23 @@ export function useLockerOperations() {
                 setPartialState({ loadingLockerInsights: false });
             }
         },
-        [pushToast, setPartialState, state.locationOverview?.lockers, state.lockers, state.selectedLocker]
+        [pushToast, setPartialState, state.locationOverview?.lockers, state.lockers, state.selectedLocker, state.loadingLockerInsights]
     );
 
     const loadLocationOverview = useCallback(
         async (locationId: string, resetLockerSelection = true) => {
-            if (!locationId) return;
+            if (!locationId || state.loadingOverview) return;
+
             setPartialState({ loadingOverview: true });
             try {
                 const overview: LockerLocationOverview = await lockerOperationsService.getLocationOverview(locationId);
+
                 const lockers = overview.lockers.length ? overview.lockers : state.lockers;
                 const selectedLockerId = resetLockerSelection
                     ? lockers[0]?.id ?? null
                     : state.selectedLockerId && lockers.some((locker) => locker.id === state.selectedLockerId)
-                    ? state.selectedLockerId
-                    : lockers[0]?.id ?? null;
+                        ? state.selectedLockerId
+                        : lockers[0]?.id ?? null;
                 const selectedLocker = selectedLockerId
                     ? (lockers.find((locker) => locker.id === selectedLockerId) as LockerDetails | undefined) ?? null
                     : null;
@@ -144,6 +151,7 @@ export function useLockerOperations() {
                     },
                 }));
 
+                // Fetch issues/maintenance for selected locker
                 if (selectedLockerId) {
                     await loadLockerInsights(selectedLockerId, false);
                 } else {
@@ -159,11 +167,13 @@ export function useLockerOperations() {
                 setPartialState({ loadingOverview: false });
             }
         },
-        [loadLockerInsights, pushToast, setPartialState, state.lockers, state.selectedLockerId]
+        [loadLockerInsights, pushToast, setPartialState, state.lockers, state.selectedLockerId, state.loadingOverview]
     );
 
     const loadLocations = useCallback(
         async (preferredLocationId?: string, options: { skipOverview?: boolean } = {}) => {
+            if (state.loadingList) return;
+
             setPartialState({ loadingList: true });
             try {
                 const digests = await lockerOperationsService.getLocationDigests();
@@ -202,14 +212,26 @@ export function useLockerOperations() {
                 setPartialState({ loadingList: false });
             }
         },
-        [loadLocationOverview, pushToast, setPartialState, state.selectedLocationId]
+        [loadLocationOverview, pushToast, setPartialState, state.selectedLocationId, state.loadingList]
     );
 
+    // ==============================================================
+    // INITIAL LOAD (MOUNT)
+    // ==============================================================
+
     useEffect(() => {
-        loadLocations().catch((error) => {
-            console.error('Initial locker locations load failed', error);
-        });
-    }, [loadLocations]);
+        mountedRef.current = true;
+        loadLocations().catch((error) => console.error('Initial locker locations load failed', error));
+        return () => {
+            mountedRef.current = false;
+        };
+        // ✅ Run only once on mount to avoid infinite loop
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ==============================================================
+    // MUTATION OPERATIONS
+    // ==============================================================
 
     const createLocker = useCallback(
         async (payload: CreateLockerPayload) => {
@@ -321,10 +343,18 @@ export function useLockerOperations() {
         [loadLockerInsights, pushToast]
     );
 
+    // ==============================================================
+    // DERIVED SELECTORS
+    // ==============================================================
+
     const selectedLocation = useMemo(() => {
         if (!state.selectedLocationId) return null;
         return state.locations.find((location) => location.id === state.selectedLocationId) ?? null;
     }, [state.locations, state.selectedLocationId]);
+
+    // ==============================================================
+    // RETURN API
+    // ==============================================================
 
     return {
         ...state,

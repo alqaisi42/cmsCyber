@@ -335,7 +335,7 @@ export function useCreateProductImage() {
 export function useUploadProductImages() {
     const queryClient = useQueryClient();
 
-    return useMutation({
+    const mutation = useMutation({
         mutationFn: async ({
                                productId,
                                files,
@@ -345,14 +345,26 @@ export function useUploadProductImages() {
             files: File[];
             metadata?: UploadImageMetadata[];
         }) => {
-            const response = await productImageService.uploadProductImages(productId, files, metadata ?? []);
+            const response = await productImageService.uploadProductImages(
+                productId,
+                files,
+                metadata ?? []
+            );
             return response.data;
         },
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({queryKey: ['product-images', variables.productId]});
+            queryClient.invalidateQueries({ queryKey: ['product-images', variables.productId] });
         },
     });
+
+    return {
+        uploadProductImages: mutation.mutateAsync,
+        isUploading: mutation.isPending,   // ✅ FIXED - this is what the form needs
+        isError: mutation.isError,
+        error: mutation.error,
+    };
 }
+
 
 /**
  * Update an existing variant
@@ -394,16 +406,18 @@ export function useDeleteVariant() {
 // CATEGORY HOOKS
 // =============================================================================
 
-export function useCategories() {
-    return useQuery<Category[], Error>({
-        queryKey: ['categories'],
+export function useCategories(providerId: string) {
+    return useQuery<ProductCategorySummary[], Error>({
+        queryKey: ['categories', providerId],
         queryFn: async () => {
-            const response = await categoryService.getCategories();
+            const response = await categoryService.getProviderCategories(providerId);
             return response.data;
         },
-        staleTime: 10 * 60 * 1000, // 10 minutes
+        enabled: !!providerId,
+        staleTime: 10 * 60 * 1000,
     });
 }
+
 
 export function useCategoryById(categoryId: string) {
     return useQuery<Category, Error>({

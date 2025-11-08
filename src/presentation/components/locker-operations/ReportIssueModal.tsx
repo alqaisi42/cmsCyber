@@ -15,7 +15,7 @@ interface ReportIssueModalProps {
     currentUser?: string;
 }
 
-const issueTypes = ['MECHANICAL', 'ELECTRICAL', 'SOFTWARE', 'SECURITY', 'CLEANING', 'OTHER'];
+const issueTypes = ['MECHANICAL','HARDWARE_MALFUNCTION', 'PHYSICAL_DAMAGE', 'SOFTWARE_ERROR', 'CLEANING_REQUIRED', 'OTHER'];
 const severities: CreateIssuePayload['severity'][] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 export function ReportIssueModal({ isOpen, onClose, locker, onSubmit, currentUser }: ReportIssueModalProps) {

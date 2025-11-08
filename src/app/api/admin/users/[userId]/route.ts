@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_BASE_URL = process.env.ADMIN_API_BASE_URL ?? 'http://localhost:8050';
+const BACKEND_BASE_URL = process.env.ADMIN_API_BASE_URL ?? 'http://148.230.111.245:32080';
 
 function buildBackendUrl(userId: string) {
     return new URL(`/api/v1/admin/users/${userId}`, BACKEND_BASE_URL);

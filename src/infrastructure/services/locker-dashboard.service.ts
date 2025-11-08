@@ -7,7 +7,7 @@ import { MockLockerDataService } from './mock-locker-data.service';
 const USE_MOCK_DATA = false; // Set to true for development without backend
 
 class LockerDashboardService {
-    private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8050';
+    private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://148.230.111.245:32080';
 
     async getUserLockerDashboard(userId: number, userName?: string): Promise<LockerDashboardResponse> {
         // Use mock data if enabled

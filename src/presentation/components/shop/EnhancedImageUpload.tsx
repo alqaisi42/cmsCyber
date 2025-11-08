@@ -41,6 +41,7 @@ import {
     Eye,
     Link,
 } from 'lucide-react';
+import toast from "react-hot-toast";
 
 // Types
 export interface ImageData {
@@ -498,17 +499,23 @@ export const EnhancedImageUpload: React.FC<EnhancedImageUploadProps> = ({
         }
     }, [images.length, maxFiles, acceptedFormats, maxFileSize]);
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const { valid, errors } = validateFiles(e.target.files);
-            if (errors.length > 0) {
-                setErrors(errors);
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+
+        const validFiles = [];
+        for (const file of files) {
+            if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                toast.error(`File "${file.name}" exceeds 50MB limit`);
+                continue; // skip this file
             }
-            if (valid.length > 0) {
-                processFiles(valid);
-            }
+            validFiles.push(file);
         }
+
+        if (validFiles.length === 0) return;
+
+        processFiles(validFiles);
     };
+
 
     // Handle sortable drag
     const handleDragStart = (event: DragStartEvent) => {
@@ -726,3 +733,5 @@ export const EnhancedImageUpload: React.FC<EnhancedImageUploadProps> = ({
         </div>
     );
 };
+
+export const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB

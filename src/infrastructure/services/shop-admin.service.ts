@@ -493,6 +493,7 @@ class ProductVariantService {
 
 class CategoryService {
     private readonly baseUrl = '/api/v1/categories';
+
     private readonly providerBaseUrl = '/api/v1/providers';
 
     private getAuthHeaders(): Record<string, string> {
