@@ -27,6 +27,7 @@ import {
     ProviderSummary,
     ProviderStatistics,
     ProductCategorySummary,
+    UpdateProductRequest,
 } from '../../core/entities/ecommerce';
 import {CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest} from '@/core/types/provider.types';
 import { ProviderCategoryCreateRequest, ProviderCategoryUpdateRequest } from '@/core/types/category.types';
@@ -246,7 +247,7 @@ export function useUpdateProduct() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({id, data}: { id: string; data: Partial<ShopProduct> }) => {
+        mutationFn: async ({id, data}: { id: string; data: UpdateProductRequest }) => {
             const response = await shopProductService.updateProduct(id, data);
             return response.data;
         },
