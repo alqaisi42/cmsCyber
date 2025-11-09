@@ -231,7 +231,12 @@ class ShopProviderService {
         const { payload, documents } = command;
         const formData = new FormData();
 
-        formData.append('payload', JSON.stringify(this.buildCreateProviderPayload(payload)));
+        const serializedPayload = JSON.stringify(this.buildCreateProviderPayload(payload));
+        if (typeof Blob !== 'undefined') {
+            formData.append('payload', new Blob([serializedPayload], { type: 'application/json' }), 'payload.json');
+        } else {
+            formData.append('payload', serializedPayload);
+        }
 
         if (documents) {
             this.appendDocuments(formData, documents);
@@ -242,7 +247,10 @@ class ShopProviderService {
             headers: this.getAuthHeaders(),
             body: formData,
         });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            const message = await this.extractErrorMessage(response);
+            throw new Error(message);
+        }
         return response.json();
     }
 
@@ -288,9 +296,35 @@ class ShopProviderService {
         Object.entries(documents).forEach(([key, files]) => {
             if (!files || files.length === 0) return;
             files.forEach((file) => {
-                formData.append(key, file);
+                formData.append(key, file, file.name);
             });
         });
+    }
+
+    private async extractErrorMessage(response: Response): Promise<string> {
+        try {
+            const contentType = response.headers.get('Content-Type');
+            if (contentType?.includes('application/json')) {
+                const body = await response.json();
+                if (typeof body === 'object' && body !== null) {
+                    if ('message' in body && typeof body.message === 'string') {
+                        return body.message;
+                    }
+                    if ('error' in body && typeof body.error === 'string') {
+                        return body.error;
+                    }
+                }
+            } else {
+                const text = await response.text();
+                if (text) {
+                    return text;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to parse error response', error);
+        }
+
+        return `Provider creation failed with status ${response.status}`;
     }
 
     /**
