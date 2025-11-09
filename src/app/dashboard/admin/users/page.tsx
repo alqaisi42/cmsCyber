@@ -51,7 +51,7 @@ const DEFAULT_FILTERS: UserFilters = {
     lastLoginBefore: '',
     socialProvider: '',
     page: 0,
-    size: 20,
+    size: 10,
 };
 
 export default function AdminUsersPage() {
@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
     const [statsLoading, setStatsLoading] = useState<boolean>(true);
     const [filters, setFilters] = useState<UserFilters>(DEFAULT_FILTERS);
     const [currentPage, setCurrentPage] = useState<number>(0);
-    const [pageSize, setPageSize] = useState<number>(DEFAULT_FILTERS.size ?? 20);
+    const [pageSize, setPageSize] = useState<number>(DEFAULT_FILTERS.size ?? 10);
     const [totalPages, setTotalPages] = useState<number>(0);
     const [totalElements, setTotalElements] = useState<number>(0);
     const [showFilters, setShowFilters] = useState<boolean>(false);
@@ -112,6 +112,36 @@ export default function AdminUsersPage() {
 
         return count;
     }, [filters]);
+
+    const visiblePages = useMemo(() => {
+        const MAX_VISIBLE_PAGES = 5;
+
+        if (totalPages <= 0) {
+            return [];
+        }
+
+        const allPages = Array.from({ length: totalPages }, (_, index) => index);
+
+        if (totalPages <= MAX_VISIBLE_PAGES) {
+            return allPages;
+        }
+
+        let start = Math.max(0, currentPage - Math.floor(MAX_VISIBLE_PAGES / 2));
+        let end = start + MAX_VISIBLE_PAGES - 1;
+
+        if (end >= totalPages) {
+            end = totalPages - 1;
+            start = Math.max(0, end - (MAX_VISIBLE_PAGES - 1));
+        }
+
+        if (start === 0) {
+            end = MAX_VISIBLE_PAGES - 1;
+        } else if (end === totalPages - 1) {
+            start = totalPages - MAX_VISIBLE_PAGES;
+        }
+
+        return allPages.slice(start, end + 1);
+    }, [totalPages, currentPage]);
 
     const fetchStatistics = useCallback(async () => {
         setStatsLoading(true);
@@ -384,7 +414,7 @@ export default function AdminUsersPage() {
     const handleClearFilters = () => {
         setFilters(DEFAULT_FILTERS);
         setCurrentPage(0);
-        setPageSize(DEFAULT_FILTERS.size ?? 20);
+        setPageSize(DEFAULT_FILTERS.size ?? 10);
     };
 
     const handlePageSizeChange = (value: number) => {
@@ -715,10 +745,24 @@ export default function AdminUsersPage() {
                             >
                                 Previous
                             </button>
-                            <div className="flex items-center gap-1">
-                                {Array.from({ length: totalPages }).slice(0, 5).map((_, index) => {
-                                    const pageNumber = index;
-                                    return (
+                            {visiblePages.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                    {visiblePages[0] > 0 && (
+                                        <>
+                                            <button
+                                                onClick={() => handlePageChange(0)}
+                                                className={`h-8 w-8 rounded-lg text-sm font-semibold transition ${
+                                                    currentPage === 0
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'border border-gray-200 text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            1
+                                        </button>
+                                        {visiblePages[0] > 1 && <span className="px-2 text-sm text-gray-500">…</span>}
+                                    </>
+                                )}
+                                    {visiblePages.map((pageNumber) => (
                                         <button
                                             key={pageNumber}
                                             onClick={() => handlePageChange(pageNumber)}
@@ -730,9 +774,26 @@ export default function AdminUsersPage() {
                                         >
                                             {pageNumber + 1}
                                         </button>
-                                    );
-                                })}
-                            </div>
+                                    ))}
+                                    {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+                                        <>
+                                            {visiblePages[visiblePages.length - 1] < totalPages - 2 && (
+                                                <span className="px-2 text-sm text-gray-500">…</span>
+                                            )}
+                                            <button
+                                                onClick={() => handlePageChange(totalPages - 1)}
+                                                className={`h-8 w-8 rounded-lg text-sm font-semibold transition ${
+                                                    currentPage === totalPages - 1
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'border border-gray-200 text-gray-600 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             <button
                                 onClick={() => handlePageChange(Math.min(totalPages - 1, currentPage + 1))}
                                 disabled={currentPage >= totalPages - 1}
