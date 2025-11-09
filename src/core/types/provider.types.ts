@@ -1,5 +1,16 @@
 // File: src/core/types/provider.types.ts
 import { ProviderAddress } from '@/core/entities/ecommerce';
+
+export type ProviderReviewStatus = 'under_review' | 'approved' | 'rejected';
+
+export interface ProviderDocumentUploads {
+    registrationLicense?: File[];
+    taxCertificate?: File[];
+    complianceCertificate?: File[];
+    contracts?: File[];
+    insurancePolicy?: File[];
+    [key: string]: File[] | undefined;
+}
 export interface ProviderFilters {
     search: string;
     status: 'all' | 'active' | 'inactive';
@@ -53,6 +64,12 @@ export interface CreateProviderRequest {
     address: ProviderAddress;
     commissionPercentage: number;
     isActive?: boolean;
+    reviewStatus: ProviderReviewStatus;
+}
+
+export interface CreateProviderCommand {
+    payload: CreateProviderRequest;
+    documents?: ProviderDocumentUploads;
 }
 
 export interface UpdateProviderRequest {
@@ -68,4 +85,5 @@ export interface UpdateProviderRequest {
     commissionPercentage?: number;
     isActive?: boolean;
     rating?: number;
+    reviewStatus?: ProviderReviewStatus;
 }

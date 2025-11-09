@@ -21,7 +21,9 @@ import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositori
 import {
     ProviderSearchRequest,
     ProviderSearchResult,
+    CreateProviderCommand,
     CreateProviderRequest,
+    ProviderDocumentUploads,
     UpdateProviderRequest,
 } from '../../core/types/provider.types';
 import {
@@ -97,6 +99,8 @@ function transformToPaginatedResponse<T>(springResponse: SpringBootPageResponse<
 
 class ShopProviderService {
     private readonly baseUrl = '/api/v1/providers';
+    private readonly externalBaseUrl =
+        process.env.NEXT_PUBLIC_PROVIDER_API_URL ?? 'http://148.230.111.245:32080/api/v1/providers';
 
     private getAuthHeaders(): Record<string, string> {
         if (typeof window === 'undefined') {
@@ -223,17 +227,70 @@ class ShopProviderService {
     /**
      * Create a new provider
      */
-    async createProvider(provider: CreateProviderRequest): Promise<ApiResponse<ShopProvider>> {
-        const response = await fetch(this.baseUrl, {
+    async createProvider(command: CreateProviderCommand): Promise<ApiResponse<ShopProvider>> {
+        const { payload, documents } = command;
+        const formData = new FormData();
+
+        formData.append('payload', JSON.stringify(this.buildCreateProviderPayload(payload)));
+
+        if (documents) {
+            this.appendDocuments(formData, documents);
+        }
+
+        const response = await fetch(this.externalBaseUrl || this.baseUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...this.getAuthHeaders(),
-            },
-            body: JSON.stringify(provider),
+            headers: this.getAuthHeaders(),
+            body: formData,
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
+    }
+
+    private buildCreateProviderPayload(provider: CreateProviderRequest) {
+        const {
+            address,
+            logoUrl,
+            contactPhone,
+            website,
+            description,
+            businessRegistrationNumber,
+            taxNumber,
+            isActive,
+            ...rest
+        } = provider;
+
+        return {
+            ...rest,
+            ...(logoUrl ? { logoUrl } : {}),
+            ...(contactPhone ? { contactPhone } : {}),
+            ...(website ? { website } : {}),
+            ...(description ? { description } : {}),
+            ...(businessRegistrationNumber ? { businessRegistrationNumber } : {}),
+            ...(taxNumber ? { taxNumber } : {}),
+            ...(typeof isActive === 'boolean' ? { isActive } : {}),
+            address: {
+                street: address.street,
+                city: address.city,
+                state: address.state,
+                postalCode: address.postalCode,
+                country: address.country,
+                ...(address.latitude !== undefined && address.latitude !== null
+                    ? { latitude: address.latitude }
+                    : {}),
+                ...(address.longitude !== undefined && address.longitude !== null
+                    ? { longitude: address.longitude }
+                    : {}),
+            },
+        };
+    }
+
+    private appendDocuments(formData: FormData, documents: ProviderDocumentUploads) {
+        Object.entries(documents).forEach(([key, files]) => {
+            if (!files || files.length === 0) return;
+            files.forEach((file) => {
+                formData.append(key, file);
+            });
+        });
     }
 
     /**

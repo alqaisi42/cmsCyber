@@ -7,6 +7,10 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 
 import { ProviderForm, ProviderFormValues } from '@/presentation/components/shop/providers/ProviderForm';
 import { useCreateProvider } from '@/presentation/hooks/useShop';
+import type {
+    CreateProviderCommand,
+    ProviderDocumentUploads,
+} from '@/core/types/provider.types';
 
 export default function NewProviderPage() {
     const router = useRouter();
@@ -16,28 +20,46 @@ export default function NewProviderPage() {
     const handleSubmit = async (values: ProviderFormValues) => {
         setServerError(null);
         try {
-            const { documents: _documents, reviewStatus: _reviewStatus, ...providerValues } = values;
-            await createProvider.mutateAsync({
+            const { documents, ...providerValues } = values;
+
+            const payload: CreateProviderCommand['payload'] = {
                 name: providerValues.name,
-                logoUrl: providerValues.logoUrl,
+                logoUrl: providerValues.logoUrl || undefined,
                 contactEmail: providerValues.contactEmail,
-                contactPhone: providerValues.contactPhone,
-                website: providerValues.website,
-                description: providerValues.description,
-                businessRegistrationNumber: providerValues.businessRegistrationNumber,
-                taxNumber: providerValues.taxNumber,
+                contactPhone: providerValues.contactPhone || undefined,
+                website: providerValues.website || undefined,
+                description: providerValues.description || undefined,
+                businessRegistrationNumber: providerValues.businessRegistrationNumber || undefined,
+                taxNumber: providerValues.taxNumber || undefined,
                 address: {
                     street: providerValues.address.street,
                     city: providerValues.address.city,
                     state: providerValues.address.state,
                     postalCode: providerValues.address.postalCode,
                     country: providerValues.address.country,
-                    latitude: providerValues.address.latitude ?? null,
-                    longitude: providerValues.address.longitude ?? null,
+                    latitude: providerValues.address.latitude ?? undefined,
+                    longitude: providerValues.address.longitude ?? undefined,
                 },
                 commissionPercentage: providerValues.commissionPercentage,
                 isActive: providerValues.isActive ?? true,
-            });
+                reviewStatus: providerValues.reviewStatus,
+            };
+
+            const documentUploads: ProviderDocumentUploads = {};
+            if (documents) {
+                Object.entries(documents).forEach(([key, fileList]) => {
+                    if (fileList && fileList.length > 0) {
+                        documentUploads[key] = Array.from(fileList);
+                    }
+                });
+            }
+
+            const command: CreateProviderCommand = {
+                payload,
+                documents: Object.keys(documentUploads).length > 0 ? documentUploads : undefined,
+            };
+
+            await createProvider.mutateAsync(command);
             router.push('/dashboard/shop/providers');
         } catch (error) {
             if (error instanceof Error) {

@@ -29,7 +29,11 @@ import {
     ProductCategorySummary,
     UpdateProductRequest,
 } from '../../core/entities/ecommerce';
-import {CreateProviderRequest, ProviderSearchRequest, UpdateProviderRequest} from '@/core/types/provider.types';
+import {
+    CreateProviderCommand,
+    ProviderSearchRequest,
+    UpdateProviderRequest,
+} from '@/core/types/provider.types';
 import { ProviderCategoryCreateRequest, ProviderCategoryUpdateRequest } from '@/core/types/category.types';
 import {ApiResponse, PaginatedResponse} from '../../core/interfaces/repositories';
 
@@ -122,7 +126,7 @@ export function useCreateProvider() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (provider: CreateProviderRequest) => {
+        mutationFn: async (provider: CreateProviderCommand) => {
             const response = await shopProviderService.createProvider(provider);
             return response.data;
         },
