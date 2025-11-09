@@ -41,8 +41,16 @@ type ProductUpdateFormProps = {
 };
 
 export function ProductUpdateForm({ product, images, onSuccess, onCancel }: ProductUpdateFormProps) {
-    const providerId = product.provider?.id ?? product.providerId;
-    const { data: categories, isLoading: loadingCategories } = useCategories(providerId ?? '');
+    const providerId = useMemo(
+        () => product.provider?.id ?? product.providerId ?? '',
+        [product]
+    );
+    const {
+        data: categories,
+        isLoading: loadingCategories,
+        isError: categoriesError,
+        error: categoriesErrorDetails,
+    } = useCategories(providerId);
     const updateProduct = useUpdateProduct();
     const { uploadProductImages, isUploading } = useUploadProductImages();
 
@@ -50,6 +58,10 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
     const [additionalRotationImages, setAdditionalRotationImages] = useState<ImageData[]>([]);
 
     const existingImages = useMemo(() => images ?? [], [images]);
+    const sortedExistingImages = useMemo(
+        () => [...existingImages].sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0)),
+        [existingImages]
+    );
     const existingRotationImages = useMemo(
         () => existingImages.filter((img) => img.imageType === '360' || img.imageType === 'rotation360'),
         [existingImages]
@@ -71,7 +83,7 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
 
     const nextRotationFrameStart = useMemo(() => {
         if (!existingRotationImages.length) {
-            return 1;
+            return 0;
         }
         return (
             existingRotationImages.reduce((max, image) => {
@@ -83,6 +95,18 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
         );
     }, [existingRotationImages]);
 
+    const defaultCategoryId = useMemo(
+        () => product.categoryId ?? product.category?.id ?? '',
+        [product]
+    );
+
+    const safeBasePrice = useMemo(() => {
+        if (typeof product.basePrice === 'number' && !Number.isNaN(product.basePrice)) {
+            return product.basePrice;
+        }
+        return 0;
+    }, [product.basePrice]);
+
     const {
         register,
         handleSubmit,
@@ -93,8 +117,8 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
         defaultValues: {
             name: product.name,
             description: product.description,
-            basePrice: product.basePrice ?? 0,
-            categoryId: product.categoryId,
+            basePrice: safeBasePrice,
+            categoryId: defaultCategoryId,
             brandName: product.brandName ?? '',
             is360Enabled: product.is360Enabled,
             isActive: product.isActive,
@@ -105,13 +129,39 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
         reset({
             name: product.name,
             description: product.description,
-            basePrice: product.basePrice ?? 0,
-            categoryId: product.categoryId,
+            basePrice: safeBasePrice,
+            categoryId: product.categoryId ?? product.category?.id ?? '',
             brandName: product.brandName ?? '',
             is360Enabled: product.is360Enabled,
             isActive: product.isActive,
         });
-    }, [product, reset]);
+    }, [product, reset, safeBasePrice]);
+
+    const flattenedCategories = useMemo(() => {
+        if (!categories?.length) {
+            return [] as Array<{ id: string; label: string }>;
+        }
+
+        const stack = [...categories.map((item) => ({ item, parents: [] as string[] }))];
+        const result: Array<{ id: string; label: string }> = [];
+
+        while (stack.length) {
+            const { item, parents } = stack.pop()!;
+            const label = parents.length ? `${parents.join(' › ')} › ${item.name}` : item.name;
+            result.push({ id: item.id, label });
+
+            if (item.subcategories?.length) {
+                item.subcategories.forEach((sub) => {
+                    stack.push({ item: sub, parents: [...parents, item.name] });
+                });
+            }
+        }
+
+        return result.sort((a, b) => a.label.localeCompare(b.label));
+    }, [categories]);
+
+    const [regularUploaderKey, setRegularUploaderKey] = useState(0);
+    const [rotationUploaderKey, setRotationUploaderKey] = useState(0);
 
     const onSubmit = async (values: UpdateFormValues) => {
         try {
@@ -136,49 +186,92 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
             let sequenceCursor = nextSequenceStart;
             let rotationFrameCursor = nextRotationFrameStart;
 
-            additionalRegularImages
+            const sortedRegularUploads = [...additionalRegularImages]
                 .filter((image) => Boolean(image.file))
-                .forEach((image, index) => {
-                    const file = image.file!;
-                    files.push(file);
-                    metadata.push({
-                        filename: file.name ?? `regular-${index + 1}.jpg`,
-                        imageType: 'REGULAR',
-                        sequenceOrder: sequenceCursor++,
-                        isPrimary: false,
-                        associatedColor: image.associatedColor,
-                        variantId: image.variantId,
-                    });
-                });
+                .sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0));
 
-            additionalRotationImages
+            const sortedRotationUploads = [...additionalRotationImages]
                 .filter((image) => Boolean(image.file))
-                .forEach((image, index) => {
-                    const file = image.file!;
-                    files.push(file);
-                    metadata.push({
-                        filename: file.name ?? `rotation-${index + 1}.jpg`,
-                        imageType: 'ROTATION360',
-                        sequenceOrder: sequenceCursor++,
-                        isPrimary: false,
-                        associatedColor: image.associatedColor,
-                        variantId: image.variantId,
-                        rotationFrameNumber: rotationFrameCursor++,
-                    });
+                .sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0));
+
+            const hadExistingPrimary = existingImages.some((img) => img.isPrimary);
+            let newPrimaryAssigned = false;
+            const regularMetadataStartIndex = metadata.length;
+
+            sortedRegularUploads.forEach((image, index) => {
+                const file = image.file!;
+                files.push(file);
+
+                const shouldBePrimary = image.isPrimary && !newPrimaryAssigned;
+                if (shouldBePrimary) {
+                    newPrimaryAssigned = true;
+                }
+
+                metadata.push({
+                    filename: file.name ?? `regular-${index + 1}.jpg`,
+                    imageType: 'REGULAR',
+                    sequenceOrder: sequenceCursor++,
+                    isPrimary: shouldBePrimary,
+                    associatedColor: image.associatedColor,
+                    variantId: image.variantId,
                 });
+            });
+
+            if (!hadExistingPrimary && !newPrimaryAssigned && metadata.length > regularMetadataStartIndex) {
+                metadata[regularMetadataStartIndex] = {
+                    ...metadata[regularMetadataStartIndex],
+                    isPrimary: true,
+                };
+                newPrimaryAssigned = true;
+            }
+
+            sortedRotationUploads.forEach((image, index) => {
+                const file = image.file!;
+                files.push(file);
+                metadata.push({
+                    filename: file.name ?? `rotation-${index + 1}.jpg`,
+                    imageType: 'ROTATION360',
+                    sequenceOrder: sequenceCursor++,
+                    isPrimary: false,
+                    associatedColor: image.associatedColor,
+                    variantId: image.variantId,
+                    rotationFrameNumber: rotationFrameCursor++,
+                });
+            });
+
+            let uploadHadFailures = false;
 
             if (files.length > 0) {
                 toast.loading('Uploading new images...', { id: 'product-update-images' });
-                await uploadProductImages({
-                    productId: product.id,
-                    files,
-                    metadata,
-                });
-                toast.dismiss('product-update-images');
+                try {
+                    const uploadResult = await uploadProductImages({
+                        productId: product.id,
+                        files,
+                        metadata,
+                    });
+
+                    if ((uploadResult?.failedUploads?.length ?? 0) > 0 || (uploadResult?.totalFailed ?? 0) > 0) {
+                        uploadHadFailures = true;
+                        const totalUploaded = uploadResult?.totalUploaded ?? uploadResult?.uploadedImages?.length ?? 0;
+                        const totalFailed = uploadResult?.totalFailed ?? uploadResult?.failedUploads?.length ?? 0;
+                        toast.error(
+                            `Uploaded ${totalUploaded} image(s). ${totalFailed} failed – please review the files and try again.`,
+                            { id: 'product-update' }
+                        );
+                    }
+                } finally {
+                    toast.dismiss('product-update-images');
+                }
             }
 
-            toast.success('Product updated successfully', { id: 'product-update' });
-            onSuccess?.();
+            if (!uploadHadFailures) {
+                toast.success('Product updated successfully', { id: 'product-update' });
+                setAdditionalRegularImages([]);
+                setAdditionalRotationImages([]);
+                setRegularUploaderKey((prev) => prev + 1);
+                setRotationUploaderKey((prev) => prev + 1);
+                onSuccess?.();
+            }
         } catch (error: any) {
             console.error('Failed to update product:', error);
             const message =
@@ -276,15 +369,23 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
                             className={`mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                                 errors.categoryId ? 'border-red-500' : 'border-slate-300'
                             }`}
-                            disabled={loadingCategories || !categories?.length}
+                            disabled={loadingCategories || !flattenedCategories.length}
                         >
-                            <option value="">Select a category</option>
-                            {categories?.map((category) => (
+                            <option value="" disabled>
+                                {loadingCategories ? 'Loading categories...' : 'Select a category'}
+                            </option>
+                            {flattenedCategories.map((category) => (
                                 <option key={category.id} value={category.id}>
-                                    {category.name}
+                                    {category.label}
                                 </option>
                             ))}
                         </select>
+                        {categoriesError && (
+                            <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {categoriesErrorDetails?.message || 'Unable to load categories. Please refresh or try again later.'}
+                            </p>
+                        )}
                         {errors.categoryId && (
                             <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" />
@@ -355,6 +456,45 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
                         <p>{existingRotationImages.length}</p>
                     </div>
                 </div>
+
+                <div className="mt-6">
+                    {sortedExistingImages.length ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {sortedExistingImages.map((image) => (
+                                <div
+                                    key={image.id}
+                                    className={`relative overflow-hidden rounded-xl border ${
+                                        image.isPrimary ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'
+                                    } bg-white shadow-sm`}
+                                >
+                                    <img
+                                        src={image.imageUrl}
+                                        alt={
+                                            image.imageType === 'rotation360'
+                                                ? `360° frame ${image.rotationFrameNumber ?? ''}`
+                                                : 'Product image'
+                                        }
+                                        className="h-36 w-full object-cover"
+                                        loading="lazy"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 bg-slate-900/70 text-white text-xs px-2 py-1 flex justify-between gap-2">
+                                        <span>{image.imageType === 'rotation360' || image.imageType === '360' ? '360°' : 'Gallery'}</span>
+                                        {typeof image.sequenceOrder === 'number' && (
+                                            <span># {image.sequenceOrder}</span>
+                                        )}
+                                    </div>
+                                    {image.isPrimary && (
+                                        <span className="absolute top-2 left-2 rounded-full bg-blue-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                            Primary
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-slate-500">No images uploaded yet. Add some below to showcase this product.</p>
+                    )}
+                </div>
             </section>
 
             <section className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
@@ -368,6 +508,7 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
                     </div>
                 </div>
                 <EnhancedImageUpload
+                    key={`regular-${regularUploaderKey}`}
                     onImagesChange={setAdditionalRegularImages}
                     initialImages={[]}
                     allowUrlInput={false}
@@ -388,6 +529,7 @@ export function ProductUpdateForm({ product, images, onSuccess, onCancel }: Prod
                     </div>
                 </div>
                 <EnhancedImageUpload
+                    key={`rotation-${rotationUploaderKey}`}
                     onImagesChange={setAdditionalRotationImages}
                     initialImages={[]}
                     allowUrlInput={false}
