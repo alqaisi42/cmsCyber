@@ -15,6 +15,7 @@ import {
     ProviderSummary,
     ProviderStatistics,
     ProductCategorySummary,
+    UpdateProductRequest,
 } from '../../core/entities/ecommerce';
 import { ApiResponse, PaginatedResponse } from '../../core/interfaces/repositories';
 import {
@@ -387,10 +388,13 @@ class ShopProductService {
     /**
      * Update product
      */
-    async updateProduct(id: string, product: Partial<ShopProduct>): Promise<ApiResponse<ShopProduct>> {
+    async updateProduct(id: string, product: UpdateProductRequest): Promise<ApiResponse<ShopProductDetail>> {
         const response = await fetch(`${this.baseUrl}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
             body: JSON.stringify(product)
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

@@ -32,3 +32,43 @@ export async function GET(
         );
     }
 }
+
+export async function PUT(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const BACKEND_URL = process.env.BACKEND_API_URL || 'http://148.230.111.245:32080';
+        const payload = await request.json();
+
+        const response = await fetch(`${BACKEND_URL}/api/v1/products/${params.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const text = await response.text();
+
+        if (!response.ok) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Failed to update product',
+                    error: text,
+                },
+                { status: response.status }
+            );
+        }
+
+        return NextResponse.json(JSON.parse(text));
+    } catch (error) {
+        console.error('Product update API Error:', error);
+        return NextResponse.json(
+            { success: false, message: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}

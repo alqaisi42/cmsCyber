@@ -223,6 +223,16 @@ export interface CreateProductRequest {
     images: CreateImageRequest[];
 }
 
+export interface UpdateProductRequest {
+    name: string;
+    description: string;
+    basePrice: number;
+    categoryId: string;
+    brandName?: string;
+    is360Enabled: boolean;
+    isActive: boolean;
+}
+
 export interface CreateVariantRequest {
     size: string;
     color: string;
