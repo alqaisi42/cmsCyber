@@ -16,26 +16,27 @@ export default function NewProviderPage() {
     const handleSubmit = async (values: ProviderFormValues) => {
         setServerError(null);
         try {
+            const { documents: _documents, reviewStatus: _reviewStatus, ...providerValues } = values;
             await createProvider.mutateAsync({
-                name: values.name,
-                logoUrl: values.logoUrl,
-                contactEmail: values.contactEmail,
-                contactPhone: values.contactPhone,
-                website: values.website,
-                description: values.description,
-                businessRegistrationNumber: values.businessRegistrationNumber,
-                taxNumber: values.taxNumber,
+                name: providerValues.name,
+                logoUrl: providerValues.logoUrl,
+                contactEmail: providerValues.contactEmail,
+                contactPhone: providerValues.contactPhone,
+                website: providerValues.website,
+                description: providerValues.description,
+                businessRegistrationNumber: providerValues.businessRegistrationNumber,
+                taxNumber: providerValues.taxNumber,
                 address: {
-                    street: values.address.street,
-                    city: values.address.city,
-                    state: values.address.state,
-                    postalCode: values.address.postalCode,
-                    country: values.address.country,
-                    latitude: values.address.latitude ?? null,
-                    longitude: values.address.longitude ?? null,
+                    street: providerValues.address.street,
+                    city: providerValues.address.city,
+                    state: providerValues.address.state,
+                    postalCode: providerValues.address.postalCode,
+                    country: providerValues.address.country,
+                    latitude: providerValues.address.latitude ?? null,
+                    longitude: providerValues.address.longitude ?? null,
                 },
-                commissionPercentage: values.commissionPercentage,
-                isActive: values.isActive ?? true,
+                commissionPercentage: providerValues.commissionPercentage,
+                isActive: providerValues.isActive ?? true,
             });
             router.push('/dashboard/shop/providers');
         } catch (error) {

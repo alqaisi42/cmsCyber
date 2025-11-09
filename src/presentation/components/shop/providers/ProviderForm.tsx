@@ -14,8 +14,22 @@ import {
     Percent,
     Loader2,
     Save,
+    FileText,
+    UploadCloud,
+    ShieldCheck,
+    Paperclip,
 } from 'lucide-react';
 import clsx from 'clsx';
+
+const isFileList = (value: unknown): value is FileList =>
+    typeof FileList !== 'undefined' && value instanceof FileList;
+
+const documentFieldSchema = z
+    .any()
+    .refine((value) => value === undefined || value === null || isFileList(value), {
+        message: 'Please upload a valid document file.',
+    })
+    .optional();
 
 const optionalStringField = z.preprocess((value) => {
     if (typeof value !== 'string') return undefined;
@@ -97,6 +111,21 @@ const providerFormSchema = z.object({
         latitude: latitudeField,
         longitude: longitudeField,
     }),
+    documents: z
+        .object({
+            registrationLicense: documentFieldSchema,
+            taxCertificate: documentFieldSchema,
+            complianceCertificate: documentFieldSchema,
+            contracts: documentFieldSchema,
+            insurancePolicy: documentFieldSchema,
+        })
+        .partial()
+        .default({}),
+    reviewStatus: z
+        .enum(['under_review', 'approved', 'rejected'], {
+            errorMap: () => ({ message: 'Please select a review status.' }),
+        })
+        .default('under_review'),
 });
 
 export type ProviderFormValues = z.infer<typeof providerFormSchema>;
@@ -118,6 +147,13 @@ export function ProviderForm({
     serverError,
     onCancel,
 }: ProviderFormProps) {
+    type DocumentFieldKey = keyof ProviderFormValues['documents'];
+    interface DocumentField {
+        key: DocumentFieldKey;
+        label: string;
+        description: string;
+        accept: string;
+    }
     const {
         register,
         handleSubmit,
@@ -146,16 +182,107 @@ export function ProviderForm({
                 latitude: defaultValues?.address?.latitude,
                 longitude: defaultValues?.address?.longitude,
             },
+            documents: {
+                registrationLicense: defaultValues?.documents?.registrationLicense,
+                taxCertificate: defaultValues?.documents?.taxCertificate,
+                complianceCertificate: defaultValues?.documents?.complianceCertificate,
+                contracts: defaultValues?.documents?.contracts,
+                insurancePolicy: defaultValues?.documents?.insurancePolicy,
+            },
+            reviewStatus: defaultValues?.reviewStatus ?? 'under_review',
         },
     });
 
     const isActive = watch('isActive');
+    const documents = watch('documents');
+    const reviewStatus = watch('reviewStatus');
 
     const sectionClassName = useMemo(
         () =>
             'rounded-2xl border border-slate-200 bg-white/90 backdrop-blur-sm shadow-sm p-6 space-y-5',
         [],
     );
+
+    const documentFields = useMemo<DocumentField[]>(
+        () =>
+            [
+                {
+                    key: 'registrationLicense',
+                    label: 'Registration License',
+                    description: 'Government-issued document confirming commercial registration.',
+                    accept: '.pdf,.png,.jpg,.jpeg',
+                },
+                {
+                    key: 'taxCertificate',
+                    label: 'Tax Certificate',
+                    description: 'Latest certificate demonstrating tax compliance.',
+                    accept: '.pdf,.png,.jpg,.jpeg',
+                },
+                {
+                    key: 'complianceCertificate',
+                    label: 'Compliance Certificate',
+                    description: 'Any compliance or regulatory approvals required to operate.',
+                    accept: '.pdf,.png,.jpg,.jpeg',
+                },
+                {
+                    key: 'contracts',
+                    label: 'Master Contracts',
+                    description: 'Signed contracts or MOUs outlining partnership terms.',
+                    accept: '.pdf,.doc,.docx',
+                },
+                {
+                    key: 'insurancePolicy',
+                    label: 'Insurance Policy',
+                    description: 'Coverage documents protecting operations and logistics.',
+                    accept: '.pdf,.png,.jpg,.jpeg',
+                },
+            ],
+        [],
+    );
+
+    const reviewStatusOptions = useMemo(
+        () =>
+            [
+                {
+                    value: 'under_review' as const,
+                    label: 'Under Review',
+                    helper: 'Documents are pending validation by the compliance team.',
+                },
+                {
+                    value: 'approved' as const,
+                    label: 'Approved',
+                    helper: 'Provider is cleared to operate and documents meet requirements.',
+                },
+                {
+                    value: 'rejected' as const,
+                    label: 'Rejected',
+                    helper: 'Documents are insufficient or invalid. Follow-up is required.',
+                },
+            ],
+        [],
+    );
+
+    const renderSelectedFiles = (fileList: FileList | null | undefined) => {
+        if (!fileList || fileList.length === 0) {
+            return <p className="text-xs text-slate-400">No document selected yet.</p>;
+        }
+
+        return (
+            <ul className="mt-3 space-y-2">
+                {Array.from(fileList).map((file) => (
+                    <li
+                        key={file.name}
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
+                    >
+                        <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="truncate" title={file.name}>
+                            {file.name}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        );
+    };
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -459,6 +586,99 @@ export function ProviderForm({
                             )}
                         </div>
                     ) : null}
+                </div>
+            </section>
+
+            <section className={sectionClassName}>
+                <header className="flex items-center gap-3">
+                    <div className="rounded-xl bg-purple-100 p-3 text-purple-600">
+                        <FileText className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-semibold text-slate-900">Compliance Documents</h2>
+                        <p className="text-sm text-slate-500">
+                            Upload onboarding paperwork so compliance and legal teams can review and approve the provider.
+                        </p>
+                    </div>
+                </header>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                    {documentFields.map((field) => {
+                        const fieldPath = `documents.${field.key}` as const;
+                        const selectedFiles = documents?.[field.key];
+
+                        return (
+                            <div key={field.key} className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-slate-700">{field.label}</label>
+                                    <p className="text-xs text-slate-500">{field.description}</p>
+                                </div>
+                                <label
+                                    className={clsx(
+                                        'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border px-4 py-6 text-center transition focus-within:outline-none focus-within:ring-2',
+                                        errors.documents?.[field.key]
+                                            ? 'border-red-300 bg-red-50 focus-within:border-red-300 focus-within:ring-red-200'
+                                            : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 focus-within:border-blue-300 focus-within:ring-blue-200',
+                                    )}
+                                >
+                                    <UploadCloud className="h-5 w-5 text-slate-400" />
+                                    <span className="text-xs font-medium text-slate-600">Click to upload or drag and drop</span>
+                                    <span className="text-[11px] text-slate-400">Accepted formats: {field.accept}</span>
+                                    <input
+                                        type="file"
+                                        accept={field.accept}
+                                        className="sr-only"
+                                        {...register(fieldPath)}
+                                    />
+                                </label>
+                                {errors.documents?.[field.key]?.message ? (
+                                    <p className="text-xs text-red-600">{errors.documents?.[field.key]?.message as string}</p>
+                                ) : null}
+                                {renderSelectedFiles(selectedFiles)}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex items-start gap-3">
+                        <ShieldCheck className="mt-0.5 h-5 w-5 text-slate-400" />
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-800">Review Status</h3>
+                                <p className="text-xs text-slate-500">
+                                    Track the onboarding stage so that stakeholders know whether the provider can go live.
+                                </p>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-3">
+                                {reviewStatusOptions.map((option) => (
+                                    <label
+                                        key={option.value}
+                                        className={clsx(
+                                            'flex cursor-pointer flex-col gap-2 rounded-lg border px-3 py-3 text-left text-xs transition',
+                                            reviewStatus === option.value
+                                                ? 'border-blue-400 bg-white shadow-sm ring-1 ring-blue-200'
+                                                : 'border-transparent bg-white/60 hover:border-slate-200',
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                value={option.value}
+                                                className="h-4 w-4 text-blue-600"
+                                                {...register('reviewStatus')}
+                                            />
+                                            <span className="text-sm font-medium text-slate-700">{option.label}</span>
+                                        </div>
+                                        <p className="text-[11px] leading-4 text-slate-500">{option.helper}</p>
+                                    </label>
+                                ))}
+                            </div>
+                            {errors.reviewStatus?.message ? (
+                                <p className="text-xs text-red-600">{errors.reviewStatus.message}</p>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
             </section>
 

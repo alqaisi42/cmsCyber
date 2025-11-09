@@ -18,7 +18,7 @@ import type { ShopProvider } from '@/core/entities/ecommerce';
 import { ProviderForm, ProviderFormValues } from '@/presentation/components/shop/providers/ProviderForm';
 import { useProviderById, useUpdateProvider } from '@/presentation/hooks/useShop';
 
-function mapProviderToFormValues(provider: ShopProvider): ProviderFormValues {
+function mapProviderToFormValues(provider: ShopProvider): Partial<ProviderFormValues> {
     return {
         name: provider.name,
         logoUrl: provider.logoUrl ?? undefined,
@@ -40,6 +40,7 @@ function mapProviderToFormValues(provider: ShopProvider): ProviderFormValues {
             latitude: provider.address?.latitude ?? undefined,
             longitude: provider.address?.longitude ?? undefined,
         },
+        reviewStatus: 'under_review',
     };
 }
 
@@ -52,7 +53,8 @@ export default function EditProviderPage({ params }: { params: { providerId: str
     const handleSubmit = async (values: ProviderFormValues) => {
         setServerError(null);
         try {
-            await updateProvider.mutateAsync({ id: params.providerId, data: values });
+            const { documents: _documents, reviewStatus: _reviewStatus, ...payload } = values;
+            await updateProvider.mutateAsync({ id: params.providerId, data: payload });
             router.push('/dashboard/shop/providers');
         } catch (mutationError) {
             if (mutationError instanceof Error) {
