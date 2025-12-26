@@ -120,13 +120,35 @@ class ShopProviderService {
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-        const apiResponse: ApiResponse<ProviderListItem[]> = await response.json();
+        const apiResponse = await response.json();
+        
+        // Handle different response structures
+        let providerList: ProviderListItem[] = [];
+        
+        if (apiResponse && apiResponse.data) {
+            if (Array.isArray(apiResponse.data)) {
+                // Direct array response: ApiResponse<ProviderListItem[]>
+                providerList = apiResponse.data;
+            } else if (apiResponse.data.content && Array.isArray(apiResponse.data.content)) {
+                // Spring Boot paginated response: ApiResponse<SpringBootPageResponse<ProviderListItem>>
+                providerList = apiResponse.data.content;
+            }
+        } else if (Array.isArray(apiResponse)) {
+            // Direct array response (no wrapper)
+            providerList = apiResponse;
+        }
+        
+        // If still empty and we have data, log a warning
+        if (providerList.length === 0 && apiResponse?.data) {
+            console.warn('Unexpected provider response structure:', apiResponse);
+        }
+
         return {
-            success: apiResponse.success,
-            data: apiResponse.data.map(mapProviderListItemToSummary),
-            message: apiResponse.message,
-            errors: apiResponse.errors,
-            timestamp: apiResponse.timestamp,
+            success: apiResponse?.success ?? true,
+            data: providerList.map(mapProviderListItemToSummary),
+            message: apiResponse?.message ?? '',
+            errors: apiResponse?.errors,
+            timestamp: apiResponse?.timestamp ?? new Date().toISOString(),
         };
     }
 

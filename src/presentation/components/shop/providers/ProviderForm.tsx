@@ -122,10 +122,10 @@ const providerFormSchema = z.object({
         .partial()
         .default({}),
     reviewStatus: z
-        .enum(['under_review', 'approved', 'rejected'], {
+        .enum(['UNDER_REVIEW', 'APPROVED', 'REJECTED'], {
             errorMap: () => ({ message: 'Please select a review status.' }),
         })
-        .default('under_review'),
+        .default('UNDER_REVIEW'),
 });
 
 export type ProviderFormValues = z.infer<typeof providerFormSchema>;
@@ -189,7 +189,7 @@ export function ProviderForm({
                 contracts: defaultValues?.documents?.contracts,
                 insurancePolicy: defaultValues?.documents?.insurancePolicy,
             },
-            reviewStatus: defaultValues?.reviewStatus ?? 'under_review',
+            reviewStatus: defaultValues?.reviewStatus ?? 'UNDER_REVIEW',
         },
     });
 
@@ -244,17 +244,17 @@ export function ProviderForm({
         () =>
             [
                 {
-                    value: 'under_review' as const,
+                    value: 'UNDER_REVIEW' as const,
                     label: 'Under Review',
                     helper: 'Documents are pending validation by the compliance team.',
                 },
                 {
-                    value: 'approved' as const,
+                    value: 'APPROVED' as const,
                     label: 'Approved',
                     helper: 'Provider is cleared to operate and documents meet requirements.',
                 },
                 {
-                    value: 'rejected' as const,
+                    value: 'REJECTED' as const,
                     label: 'Rejected',
                     helper: 'Documents are insufficient or invalid. Follow-up is required.',
                 },

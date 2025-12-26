@@ -1,7 +1,7 @@
 // File: src/core/types/provider.types.ts
 import { ProviderAddress } from '@/core/entities/ecommerce';
 
-export type ProviderReviewStatus = 'under_review' | 'approved' | 'rejected';
+export type ProviderReviewStatus = 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
 export interface ProviderDocumentUploads {
     registrationLicense?: File[];

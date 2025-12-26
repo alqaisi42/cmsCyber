@@ -40,7 +40,7 @@ function mapProviderToFormValues(provider: ShopProvider): Partial<ProviderFormVa
             latitude: provider.address?.latitude ?? undefined,
             longitude: provider.address?.longitude ?? undefined,
         },
-        reviewStatus: 'under_review',
+        reviewStatus: 'UNDER_REVIEW',
     };
 }
 
